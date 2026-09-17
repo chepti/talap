@@ -4,7 +4,7 @@ import { todayStr } from '../lib/date';
 import { downloadCsv, copyTsv, lessonsToRows } from '../lib/csv';
 import DatePicker from '../components/DatePicker';
 import { EVENT_TYPES } from '../components/EventBucketBar';
-import { formatHebrewDate } from '../lib/hebrewDate';
+import { formatHebrewDate, hebrewDayLetters, formatIsoWithHebrew } from '../lib/hebrewDate';
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
 
@@ -50,7 +50,7 @@ function LessonTable({ g }) {
   return (
     <div className="card" style={{ overflowX: 'auto' }}>
       <div style={{ fontWeight: 700, marginBottom: 8 }}>
-        {g.date} · {g.className} · שיעור {g.period} · {g.subject}{g.topic ? ` · ${g.topic}` : ''}
+        {formatIsoWithHebrew(g.date)} · {g.className} · שיעור {g.period} · {g.subject}{g.topic ? ` · ${g.topic}` : ''}
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
         <thead>
@@ -218,7 +218,7 @@ function StudentCard({ classes }) {
               <tbody>
                 {allEvents.map((e) => (
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '4px 8px' }}>{e.date}</td>
+                    <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>{formatIsoWithHebrew(e.date)}</td>
                     <td style={{ padding: '4px 8px' }}>{e.subject}</td>
                     <td style={{ padding: '4px 8px' }}><EventDot color={COLOR_BY_TYPE[e.type]} label={e.typeLabel} /></td>
                     <td style={{ padding: '4px 8px', opacity: 0.8 }}>{e.note}</td>
@@ -275,15 +275,18 @@ function MonthGrid({ y, m, countsByDay, current, onPickInfo }) {
               background: '#fdfaf3', border: '1px solid var(--color-border)',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
             }}>
-              <span style={{ fontSize: '0.68rem', opacity: 0.5 }}>{day}</span>
+              <span style={{ fontSize: '0.62rem', opacity: 0.6, display: 'flex', gap: 3, alignItems: 'baseline' }}>
+                <b style={{ opacity: 0.85 }}>{day}</b>
+                <span style={{ opacity: 0.55 }}>{hebrewDayLetters(new Date(y, m, day))}</span>
+              </span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
                 {present.map((t) => {
                   const size = circleSize(dayCounts[t.key]);
                   return (
                     <button
                       key={t.key}
-                      title={`${dateStr} · ${t.label}: ${dayCounts[t.key]}`}
-                      onClick={() => onPickInfo(`${dateStr} · ${t.label}: ${dayCounts[t.key]}`)}
+                      title={`${formatIsoWithHebrew(dateStr)} · ${t.label}: ${dayCounts[t.key]}`}
+                      onClick={() => onPickInfo(`${formatIsoWithHebrew(dateStr)} · ${t.label}: ${dayCounts[t.key]}`)}
                       style={{
                         width: size, height: size, borderRadius: '50%', background: t.color, border: 'none', padding: 0,
                         color: '#fff', fontSize: size > 20 ? '0.65rem' : '0.55rem', fontWeight: 700,

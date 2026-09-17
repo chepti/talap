@@ -53,3 +53,17 @@ export function formatHebrewDate(date, { withYear = true } = {}) {
     return p.value;
   }).join('');
 }
+
+/** רק יום החודש העברי באותיות (בלי חודש/שנה) — לתצוגה קומפקטית, למשל בלוח שנה. */
+export function hebrewDayLetters(date) {
+  const day = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric' }).formatToParts(date)
+    .find((p) => p.type === 'day');
+  return day ? hebrewNumeral(Number(day.value)) : '';
+}
+
+/** תאריך לועזי (YYYY-MM-DD) + תאריך עברי מלא בסוגריים, לשימוש בטבלאות. */
+export function formatIsoWithHebrew(isoDateStr) {
+  const [y, m, d] = isoDateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y} (${formatHebrewDate(date)})`;
+}
