@@ -73,6 +73,7 @@ function helpDoc() {
             'students_upsert' => 'POST — {id?, classId, fullName, mashovMatch?, photoUrl?}. mashovMatch = חלק מהשם לחיפוש במשוב (ברירת מחדל fullName).',
             'students_delete' => 'POST — {id}.',
             'students_import' => 'POST — {classId, rows:[{fullName, mashovMatch?}, ...]} ייבוא בכמות (מאקסל/הדבקה), משבץ אוטומטית למקומות ריקים.',
+            'photo_upload'    => 'POST — {studentId, imageBase64}. imageBase64 = data URL או base64 גולמי של תמונה מרובעת קטנה (JPEG). שומר ומעדכן photoUrl.',
             'schedule_list'   => 'GET — מערכת השעות השבועית הקבועה.',
             'schedule_set'    => 'POST — {entries:[{dayOfWeek(0=ראשון..6=שבת), period, startTime(HH:MM), endTime(HH:MM), classId, subject, mashovSubjectLabel?}]} — מחליף את כל המערכת.',
             'current_lesson'  => 'GET — ?classId=N&at=ISO(אופציונלי, ברירת מחדל עכשיו) — איזה שיעור (period+subject) פעיל כרגע לפי מערכת השעות.',
@@ -311,6 +312,36 @@ function dispatch($action, $data) {
             return $students;
         });
         return ['created' => $created, 'count' => count($created)];
+    }
+
+    case 'photo_upload': {
+        $studentId = (int)($data['studentId'] ?? 0);
+        $imageBase64 = $data['imageBase64'] ?? '';
+        if (!$studentId) fail('studentId required');
+        if (!$imageBase64) fail('imageBase64 required');
+        if (preg_match('/^data:image\/\w+;base64,/', $imageBase64)) {
+            $imageBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $imageBase64);
+        }
+        $binary = base64_decode($imageBase64, true);
+        if ($binary === false) fail('invalid base64 image data');
+        if (strlen($binary) > 3 * 1024 * 1024) fail('image too large (max 3MB)', 413);
+
+        global $DATA_DIR;
+        $photosDir = dirname($DATA_DIR) . '/photos';
+        if (!is_dir($photosDir)) mkdir($photosDir, 0775, true);
+        $filename = 'student_' . $studentId . '.jpg';
+        file_put_contents($photosDir . '/' . $filename, $binary);
+
+        $publicPath = 'backend/photos/' . $filename . '?v=' . time();
+        $result = null;
+        storeUpdate('students', [], function ($students) use ($studentId, $publicPath, &$result) {
+            foreach ($students as &$s) {
+                if ($s['id'] === $studentId) { $s['photoUrl'] = $publicPath; $result = $s; break; }
+            }
+            return $students;
+        });
+        if (!$result) fail("student #$studentId not found", 404);
+        return ['student' => $result];
     }
 
     case 'schedule_list':

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import PhotoCapture from '../components/PhotoCapture';
+
+function initials(name) {
+  return (name || '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('');
+}
 
 export default function RosterAdmin({ onBack }) {
   const [classes, setClasses] = useState([]);
@@ -7,6 +12,7 @@ export default function RosterAdmin({ onBack }) {
   const [students, setStudents] = useState([]);
   const [newName, setNewName] = useState('');
   const [importText, setImportText] = useState('');
+  const [photoStudentId, setPhotoStudentId] = useState(null);
   const [error, setError] = useState('');
 
   async function loadClasses() {
@@ -54,6 +60,12 @@ export default function RosterAdmin({ onBack }) {
     loadStudents(classId);
   }
 
+  async function savePhoto(dataUrl) {
+    await api('photo_upload', { studentId: photoStudentId, imageBase64: dataUrl });
+    setPhotoStudentId(null);
+    loadStudents(classId);
+  }
+
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, height: '100%', overflowY: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -69,6 +81,16 @@ export default function RosterAdmin({ onBack }) {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {students.map((s) => (
           <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={() => setPhotoStudentId(s.id)} title="הוספת/החלפת תמונה" style={{ padding: 0, borderRadius: '50%', flexShrink: 0 }}>
+              {s.photoUrl ? (
+                <img src={s.photoUrl} alt="" width={40} height={40} style={{ borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 600,
+                }}>{initials(s.fullName)}</div>
+              )}
+            </button>
             <input type="text" defaultValue={s.fullName} onBlur={(e) => updateField(s.id, 'fullName', e.target.value)} style={{ flex: 1 }} />
             <input type="text" defaultValue={s.mashovMatch} placeholder="שם לחיפוש במשוב" onBlur={(e) => updateField(s.id, 'mashovMatch', e.target.value)} style={{ flex: 1 }} />
             <button className="pill-btn ghost" onClick={() => removeStudent(s.id)}>מחיקה</button>
@@ -87,6 +109,10 @@ export default function RosterAdmin({ onBack }) {
         <textarea rows={5} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder={'דנה כהן\nעומר לוי, עומר לוי-אבני'} />
         <button className="pill-btn secondary" onClick={doImport}>ייבוא</button>
       </div>
+
+      {photoStudentId != null && (
+        <PhotoCapture onSave={savePhoto} onCancel={() => setPhotoStudentId(null)} />
+      )}
     </div>
   );
 }

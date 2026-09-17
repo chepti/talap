@@ -3,6 +3,8 @@ backend/api/config.php
 
 # נתונים בשרת — נוצרים אוטומטית, לא חלק מהקוד
 backend/data/*.json
+backend/photos/*.jpg
+!backend/photos/.htaccess
 
 # build/deps
 frontend/node_modules/
