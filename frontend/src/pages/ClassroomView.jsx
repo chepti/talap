@@ -294,15 +294,15 @@ export default function ClassroomView({ classId, onBack, onSwitchClass }) {
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-      {/* פינת בקרה קבועה — שני כפתורים בפינות נגדיות, השאר בתפריט הנשלף */}
-      <div style={{ position: 'absolute', top: 10, insetInlineStart: 10, zIndex: 30 }}>
-        <button className="pill-btn ghost" onClick={() => setDrawerOpen((o) => !o)} title="תפריט" style={{ padding: '12px 14px' }}>
-          <MenuIcon size={24} />
+      {/* פינת בקרה קבועה — יושבים בתוך פינות הקנבס עצמו, לא דוחקים אותו למטה */}
+      <div style={{ position: 'absolute', top: 24, insetInlineEnd: 24, zIndex: 30 }}>
+        <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא" style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.85)' }}>
+          <MaximizeIcon />
         </button>
       </div>
-      <div style={{ position: 'absolute', top: 10, insetInlineEnd: 10, zIndex: 30 }}>
-        <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא" style={{ padding: '9px 11px' }}>
-          <MaximizeIcon />
+      <div style={{ position: 'absolute', top: 24, insetInlineStart: 24, zIndex: 30 }}>
+        <button className="pill-btn ghost" onClick={() => setDrawerOpen((o) => !o)} title="תפריט" style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.85)' }}>
+          <MenuIcon size={22} />
         </button>
       </div>
 
@@ -323,20 +323,23 @@ export default function ClassroomView({ classId, onBack, onSwitchClass }) {
           {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (dayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר ליום הזה בכיתה זו')}
         </span>
 
-        {allClasses.length > 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>מעבר לכיתה אחרת:</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {allClasses.filter((c) => c.id !== classId).map((c) => (
-                <button key={c.id} className="pill-btn secondary" style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-                  onClick={() => { setDrawerOpen(false); onSwitchClass(c.id); }}
-                >{c.name}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
         <DatePicker value={viewDate} onChange={setViewDate} />
+
+        {allClasses.length > 1 && (
+          <>
+            <hr style={{ width: '100%', border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>מעבר לכיתה אחרת:</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {allClasses.filter((c) => c.id !== classId).map((c) => (
+                  <button key={c.id} className="pill-btn secondary" style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                    onClick={() => { setDrawerOpen(false); onSwitchClass(c.id); }}
+                  >{c.name}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {dayLessons.length > 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -389,7 +392,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass }) {
       </div>
 
       {/* תוכן ראשי — הכיתה במרכז המסך */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '64px 20px 14px', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '14px 20px', gap: 10 }}>
         {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
 
         {editMode === 'seating' && (

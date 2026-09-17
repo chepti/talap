@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { api, setKey } from '../lib/api';
+import { useAppBackground } from '../lib/useBackground';
 
 export default function Login({ onSuccess }) {
+  const bg = useAppBackground();
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,7 +27,7 @@ export default function Login({ onSuccess }) {
   return (
     <div style={{
       height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backgroundImage: 'linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.7)), url(login-bg.png)',
+      backgroundImage: `linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.7)), url(${bg})`,
       backgroundSize: 'cover', backgroundPosition: 'center',
     }}>
       <form onSubmit={submit} className="card" style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}>

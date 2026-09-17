@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import PhotoCapture from '../components/PhotoCapture';
+import { useAppBackground } from '../lib/useBackground';
 
 function CameraIcon() {
   return (
@@ -12,6 +13,7 @@ function CameraIcon() {
 }
 
 export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onLogout }) {
+  const bg = useAppBackground();
   const [classes, setClasses] = useState(null);
   const [newName, setNewName] = useState('');
   const [photoClassId, setPhotoClassId] = useState(null);
@@ -46,7 +48,11 @@ export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onLo
   if (!classes) return <div style={{ padding: 24 }}>טוענת…</div>;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      height: '100%', display: 'flex', flexDirection: 'column',
+      backgroundImage: `linear-gradient(rgba(244,237,225,0.45), rgba(244,237,225,0.6)), url(${bg})`,
+      backgroundSize: 'cover', backgroundPosition: 'center',
+    }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 24, padding: 24 }}>
         <h1 style={{ margin: 0 }}>בחירת כיתה</h1>
         {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
@@ -60,6 +66,7 @@ export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onLo
                   width: '100%', height: '100%', borderRadius: 18, border: '2px solid var(--color-primary)',
                   background: c.photoUrl ? `linear-gradient(rgba(0,0,0,0.05), rgba(0,0,0,0.55)), url(${c.photoUrl})` : '#fff',
                   backgroundSize: 'cover', backgroundPosition: 'center',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
                   display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 10,
                 }}
               >
