@@ -19,9 +19,9 @@ function MaximizeIcon() {
   );
 }
 
-function MenuIcon() {
+function MenuIcon({ size = 18 }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   );
@@ -35,8 +35,9 @@ function toggleFullscreen() {
   }
 }
 
-export default function ClassroomView({ classId, onBack }) {
+export default function ClassroomView({ classId, onBack, onSwitchClass }) {
   const [classData, setClassData] = useState(null);
+  const [allClasses, setAllClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [lesson, setLesson] = useState(undefined); // undefined = loading, null = no lesson now
   const [topic, setTopic] = useState('');
@@ -84,6 +85,7 @@ export default function ClassroomView({ classId, onBack }) {
     ]);
     const cls = classes.find((c) => c.id === classId);
     setClassData(cls);
+    setAllClasses(classes);
     setStudents(students);
     setLayoutRows(cls?.rows || 4);
     setLayoutCols(cls?.cols || 4);
@@ -292,11 +294,13 @@ export default function ClassroomView({ classId, onBack }) {
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-      {/* פינת בקרה קבועה — רק שני כפתורים, השאר בתפריט הנשלף */}
-      <div style={{ position: 'absolute', top: 10, insetInlineStart: 10, zIndex: 30, display: 'flex', gap: 8 }}>
-        <button className="pill-btn ghost" onClick={() => setDrawerOpen((o) => !o)} title="תפריט" style={{ padding: '9px 11px' }}>
-          <MenuIcon />
+      {/* פינת בקרה קבועה — שני כפתורים בפינות נגדיות, השאר בתפריט הנשלף */}
+      <div style={{ position: 'absolute', top: 10, insetInlineStart: 10, zIndex: 30 }}>
+        <button className="pill-btn ghost" onClick={() => setDrawerOpen((o) => !o)} title="תפריט" style={{ padding: '12px 14px' }}>
+          <MenuIcon size={24} />
         </button>
+      </div>
+      <div style={{ position: 'absolute', top: 10, insetInlineEnd: 10, zIndex: 30 }}>
         <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא" style={{ padding: '9px 11px' }}>
           <MaximizeIcon />
         </button>
@@ -313,11 +317,24 @@ export default function ClassroomView({ classId, onBack }) {
         transform: `translateX(${drawerOpen ? '0' : '100%'})`, transition: 'transform 0.25s ease',
         padding: '64px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14,
       }}>
-        <button className="pill-btn ghost" onClick={tryBack} style={{ alignSelf: 'flex-start' }}>← כיתות</button>
+        <button className="pill-btn ghost" onClick={tryBack} style={{ alignSelf: 'flex-start' }}>← למסך הראשי</button>
         <h1 style={{ margin: 0, fontSize: '1.3rem' }}>{classData.name}</h1>
         <span style={{ opacity: 0.7, fontSize: '0.9rem' }}>
           {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (dayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר ליום הזה בכיתה זו')}
         </span>
+
+        {allClasses.length > 1 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>מעבר לכיתה אחרת:</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {allClasses.filter((c) => c.id !== classId).map((c) => (
+                <button key={c.id} className="pill-btn secondary" style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                  onClick={() => { setDrawerOpen(false); onSwitchClass(c.id); }}
+                >{c.name}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <DatePicker value={viewDate} onChange={setViewDate} />
 
@@ -372,7 +389,7 @@ export default function ClassroomView({ classId, onBack }) {
       </div>
 
       {/* תוכן ראשי — הכיתה במרכז המסך */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '14px 20px', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '64px 20px 14px', gap: 10 }}>
         {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
 
         {editMode === 'seating' && (
