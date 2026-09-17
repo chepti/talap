@@ -9,7 +9,7 @@ const TYPES = [
 ];
 
 export { TYPES as EVENT_TYPES };
-export const DELETE_KEY = '__delete__';
+export const EDIT_KEY = '__edit__';
 
 function BucketIcon() {
   return (
@@ -21,14 +21,11 @@ function BucketIcon() {
   );
 }
 
-function TrashIcon() {
+function EditIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6" />
-      <path d="M14 11v6" />
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
 }
@@ -64,22 +61,22 @@ export default function EventBucketBar({ active, onSelect }) {
       <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)', margin: '0 4px' }} />
 
       <button
-        onClick={() => onSelect(active === DELETE_KEY ? null : DELETE_KEY)}
-        title="מחיקת סימון"
+        onClick={() => onSelect(active === EDIT_KEY ? null : EDIT_KEY)}
+        title="עריכת סימון"
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           borderRadius: 'var(--radius-pill)', padding: '10px 18px',
-          background: active === DELETE_KEY ? '#555' : '#fff',
-          color: active === DELETE_KEY ? '#fff' : '#555',
+          background: active === EDIT_KEY ? '#555' : '#fff',
+          color: active === EDIT_KEY ? '#fff' : '#555',
           border: '2px solid #555',
           fontWeight: 600, fontSize: '0.95rem',
-          boxShadow: active === DELETE_KEY ? '0 3px 10px rgba(0,0,0,0.18)' : 'none',
-          transform: active === DELETE_KEY ? 'translateY(-2px)' : 'none',
+          boxShadow: active === EDIT_KEY ? '0 3px 10px rgba(0,0,0,0.18)' : 'none',
+          transform: active === EDIT_KEY ? 'translateY(-2px)' : 'none',
           transition: 'all 0.15s ease',
         }}
       >
-        <TrashIcon />
-        מחיקת סימון
+        <EditIcon />
+        עריכת סימון
       </button>
     </div>
   );

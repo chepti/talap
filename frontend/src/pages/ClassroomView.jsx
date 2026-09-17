@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { todayStr } from '../lib/date';
 import DeskGrid from '../components/DeskGrid';
-import EventBucketBar, { EVENT_TYPES, DELETE_KEY } from '../components/EventBucketBar';
+import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
 import DatePicker from '../components/DatePicker';
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
@@ -40,7 +40,9 @@ export default function ClassroomView({ classId, onBack }) {
   const [selectedPoolStudent, setSelectedPoolStudent] = useState(null);
   const [noteEvent, setNoteEvent] = useState(null);
   const [noteText, setNoteText] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState(null); // { studentId, studentName }
+  const [editTarget, setEditTarget] = useState(null); // { studentId, studentName }
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [layoutRows, setLayoutRows] = useState(4);
   const [layoutCols, setLayoutCols] = useState(4);
@@ -141,13 +143,27 @@ export default function ClassroomView({ classId, onBack }) {
     return map;
   }, [events]);
 
-  const deleteTargetEvents = useMemo(
-    () => (deleteTarget ? events.filter((e) => e.studentId === deleteTarget.studentId) : []),
-    [deleteTarget, events]
+  const editTargetEvents = useMemo(
+    () => (editTarget ? events.filter((e) => e.studentId === editTarget.studentId) : []),
+    [editTarget, events]
   );
 
   async function deleteOneEvent(id) {
+    if (editingNoteId === id) { setEditingNoteId(null); setEditingNoteText(''); }
     await api('events_delete', { id });
+    await refreshEvents();
+  }
+
+  function startEditNote(ev) {
+    setEditingNoteId(ev.id);
+    setEditingNoteText(ev.note || '');
+  }
+
+  async function saveEditedNote() {
+    if (editingNoteId == null) return;
+    await api('events_set_note', { id: editingNoteId, note: editingNoteText });
+    setEditingNoteId(null);
+    setEditingNoteText('');
     await refreshEvents();
   }
 
@@ -198,9 +214,10 @@ export default function ClassroomView({ classId, onBack }) {
     if (!activeBucket) return;
     if (!studentId) return;
 
-    if (activeBucket === DELETE_KEY) {
+    if (activeBucket === EDIT_KEY) {
       const student = studentsById[studentId];
-      setDeleteTarget({ studentId, studentName: student?.fullName || '' });
+      setEditingNoteId(null);
+      setEditTarget({ studentId, studentName: student?.fullName || '' });
       return;
     }
 
@@ -371,21 +388,33 @@ export default function ClassroomView({ classId, onBack }) {
         </div>
       )}
 
-      {deleteTarget && (
+      {editTarget && (
         <div className="card" style={{
           position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: '90vw',
           display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', zIndex: 20,
         }}>
-          <span style={{ fontWeight: 600 }}>הסימונים של {deleteTarget.studentName} בשיעור הזה:</span>
-          {deleteTargetEvents.length === 0 && <span style={{ opacity: 0.6 }}>אין סימונים למחיקה</span>}
-          {deleteTargetEvents.map((e) => (
-            <div key={e.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <span style={{ width: 12, height: 12, borderRadius: '50%', background: COLOR_BY_TYPE[e.type], display: 'inline-block' }} />
-              <span style={{ flex: 1 }}>{e.typeLabel}{e.note ? ` — ${e.note}` : ''}</span>
-              <button className="pill-btn ghost" style={{ color: 'var(--color-removal)' }} onClick={() => deleteOneEvent(e.id)}>מחיקה</button>
+          <span style={{ fontWeight: 600 }}>הסימונים של {editTarget.studentName} בשיעור הזה:</span>
+          {editTargetEvents.length === 0 && <span style={{ opacity: 0.6 }}>אין סימונים</span>}
+          {editTargetEvents.map((e) => (
+            <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 12, height: 12, borderRadius: '50%', background: COLOR_BY_TYPE[e.type], display: 'inline-block' }} />
+                <span style={{ flex: 1 }}>{e.typeLabel}{e.note ? ` — ${e.note}` : ''}</span>
+                {editingNoteId !== e.id && (
+                  <button className="pill-btn ghost" onClick={() => startEditNote(e)}>{e.note ? 'עריכת הערה' : 'הוספת הערה'}</button>
+                )}
+                <button className="pill-btn ghost" style={{ color: 'var(--color-removal)' }} onClick={() => deleteOneEvent(e.id)}>מחיקה</button>
+              </div>
+              {editingNoteId === e.id && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="text" value={editingNoteText} onChange={(ev) => setEditingNoteText(ev.target.value)} placeholder="הערה" style={{ flex: 1 }} />
+                  <button className="pill-btn" onClick={saveEditedNote}>שמירה</button>
+                  <button className="pill-btn ghost" onClick={() => { setEditingNoteId(null); setEditingNoteText(''); }}>ביטול</button>
+                </div>
+              )}
             </div>
           ))}
-          <button className="pill-btn secondary" onClick={() => setDeleteTarget(null)}>סגירה</button>
+          <button className="pill-btn secondary" onClick={() => { setEditTarget(null); setEditingNoteId(null); }}>סגירה</button>
         </div>
       )}
 
