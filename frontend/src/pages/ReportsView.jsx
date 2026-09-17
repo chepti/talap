@@ -20,6 +20,31 @@ function schoolYearStart() {
   return `${y}-09-01`;
 }
 
+function CountBadge({ color, count, label }) {
+  const zero = !count;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 64 }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: '50%',
+        background: zero ? `${color}33` : color,
+        color: zero ? color : '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontWeight: 700, fontSize: '1rem',
+      }}>{zero ? '–' : count}</div>
+      <span style={{ fontSize: '0.75rem', opacity: zero ? 0.5 : 1, textAlign: 'center' }}>{label}</span>
+    </div>
+  );
+}
+
+function EventDot({ color, label }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
+      {label}
+    </span>
+  );
+}
+
 function LessonTable({ g }) {
   return (
     <div className="card" style={{ overflowX: 'auto' }}>
@@ -39,12 +64,7 @@ function LessonTable({ g }) {
           {g.events.map((e) => (
             <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
               <td style={{ padding: '4px 8px' }}>{e.studentName}</td>
-              <td style={{ padding: '4px 8px' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLOR_BY_TYPE[e.type], display: 'inline-block' }} />
-                  {e.typeLabel}
-                </span>
-              </td>
+              <td style={{ padding: '4px 8px' }}><EventDot color={COLOR_BY_TYPE[e.type]} label={e.typeLabel} /></td>
               <td style={{ padding: '4px 8px', opacity: 0.8 }}>{e.note}</td>
               <td style={{ padding: '4px 8px', opacity: 0.6 }}>{e.ts?.slice(11, 16)}</td>
             </tr>
@@ -173,12 +193,9 @@ function StudentCard({ classes }) {
 
       {lessons && (
         <>
-          <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          <div className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 18, justifyContent: 'center' }}>
             {EVENT_TYPES.map((t) => (
-              <div key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 110 }}>
-                <span style={{ width: 14, height: 14, borderRadius: '50%', background: t.color, display: 'inline-block' }} />
-                <span>{t.label}: <b>{counts[t.key] || 0}</b></span>
-              </div>
+              <CountBadge key={t.key} color={t.color} count={counts[t.key] || 0} label={t.label} />
             ))}
           </div>
 
@@ -202,7 +219,7 @@ function StudentCard({ classes }) {
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '4px 8px' }}>{e.date}</td>
                     <td style={{ padding: '4px 8px' }}>{e.subject}</td>
-                    <td style={{ padding: '4px 8px' }}>{e.typeLabel}</td>
+                    <td style={{ padding: '4px 8px' }}><EventDot color={COLOR_BY_TYPE[e.type]} label={e.typeLabel} /></td>
                     <td style={{ padding: '4px 8px', opacity: 0.8 }}>{e.note}</td>
                   </tr>
                 ))}
@@ -216,30 +233,43 @@ function StudentCard({ classes }) {
   );
 }
 
+function circleSize(count) {
+  return 16 + Math.min(count, 6) * 5;
+}
+
 function Trends({ classes }) {
   const [classFilter, setClassFilter] = useState('');
+  const [students, setStudents] = useState([]);
+  const [studentFilter, setStudentFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [countsByDay, setCountsByDay] = useState({});
   const [error, setError] = useState('');
 
   useEffect(() => {
+    setStudentFilter('');
+    if (!classFilter) { setStudents([]); return; }
+    api('students_list', { classId: classFilter }).then((r) => setStudents(r.students)).catch((e) => setError(e.message));
+  }, [classFilter]);
+
+  useEffect(() => {
     const first = `${month.y}-${String(month.m + 1).padStart(2, '0')}-01`;
     const lastDay = new Date(month.y, month.m + 1, 0).getDate();
     const last = `${month.y}-${String(month.m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    api('events_range', { from: first, to: last, classId: classFilter || undefined })
+    api('events_range', { from: first, to: last, classId: classFilter || undefined, studentId: studentFilter || undefined })
       .then((r) => {
         const byDay = {};
         for (const g of r.lessons) {
           for (const e of g.events) {
             if (typeFilter && e.type !== typeFilter) continue;
-            byDay[g.date] = (byDay[g.date] || 0) + 1;
+            if (!byDay[g.date]) byDay[g.date] = {};
+            byDay[g.date][e.type] = (byDay[g.date][e.type] || 0) + 1;
           }
         }
         setCountsByDay(byDay);
       })
       .catch((e) => setError(e.message));
-  }, [classFilter, typeFilter, month]);
+  }, [classFilter, studentFilter, typeFilter, month]);
 
   const first = new Date(month.y, month.m, 1);
   const startDow = first.getDay();
@@ -247,7 +277,6 @@ function Trends({ classes }) {
   const cells = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  const maxCount = Math.max(1, ...Object.values(countsByDay));
   const monthLabel = new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' }).format(first);
 
   function changeMonth(delta) {
@@ -262,6 +291,10 @@ function Trends({ classes }) {
         <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
           <option value="">כל הכיתות</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)} disabled={!classFilter}>
+          <option value="">כל התלמידים</option>
+          {students.map((s) => <option key={s.id} value={s.id}>{s.fullName}</option>)}
         </select>
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">כל סוגי האירועים</option>
@@ -284,23 +317,33 @@ function Trends({ classes }) {
           {cells.map((day, i) => {
             if (!day) return <div key={i} />;
             const dateStr = `${month.y}-${String(month.m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const count = countsByDay[dateStr] || 0;
-            const intensity = count ? 0.15 + 0.75 * (count / maxCount) : 0;
+            const dayCounts = countsByDay[dateStr] || {};
+            const hasAny = Object.keys(dayCounts).length > 0;
             return (
               <div key={i} style={{
-                borderRadius: 10, padding: '10px 4px', textAlign: 'center', minHeight: 46,
-                background: count ? `rgba(47,111,79,${intensity})` : '#f4ede1',
-                color: intensity > 0.5 ? '#fff' : 'var(--color-ink)',
-                display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center',
+                borderRadius: 10, padding: '4px 2px', minHeight: 62,
+                background: '#fdfaf3', border: '1px solid var(--color-border)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               }}>
-                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{day}</span>
-                {count > 0 && <span style={{ fontWeight: 700 }}>{count}</span>}
+                <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{day}</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
+                  {hasAny ? EVENT_TYPES.filter((t) => dayCounts[t.key]).map((t) => {
+                    const size = circleSize(dayCounts[t.key]);
+                    return (
+                      <div key={t.key} title={`${t.label}: ${dayCounts[t.key]}`} style={{
+                        width: size, height: size, borderRadius: '50%', background: t.color,
+                        color: '#fff', fontSize: size > 22 ? '0.7rem' : '0.6rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{dayCounts[t.key]}</div>
+                    );
+                  }) : null}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
-      <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>גוון כהה יותר = יותר אירועים באותו יום (לפי הסינון שנבחר).</div>
+      <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>כל עיגול הוא סוג אירוע — הגודל גדל לפי כמות האירועים מאותו סוג באותו יום.</div>
     </div>
   );
 }
