@@ -7,32 +7,32 @@ function Seat({ student, dots, selected, editMode, onClick }) {
     <button
       onClick={onClick}
       style={{
-        flex: 1, minWidth: 0, minHeight: 64,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+        flex: '1 1 0', minWidth: 0, height: '100%', minHeight: 84,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
         background: selected ? 'var(--color-primary-light)' : '#fffdf8',
         border: selected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-        borderRadius: 12, padding: '6px 4px', position: 'relative',
+        borderRadius: 12, padding: '8px 4px', position: 'relative',
         opacity: student ? 1 : 0.5,
       }}
     >
       {student?.photoUrl ? (
-        <img src={student.photoUrl} alt="" width={28} height={28} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+        <img src={student.photoUrl} alt="" width={44} height={44} style={{ borderRadius: '50%', objectFit: 'cover' }} />
       ) : student ? (
         <div style={{
-          width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600,
+          width: 44, height: 44, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 600,
         }}>{initials(student.fullName)}</div>
       ) : (
-        <div style={{ width: 28, height: 28 }} />
+        <div style={{ width: 44, height: 44 }} />
       )}
-      <span style={{ fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+      <span style={{ fontSize: '0.95rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
         {student ? student.fullName : (editMode ? 'ריק' : '')}
       </span>
       {dots && dots.length > 0 && (
-        <div style={{ display: 'flex', gap: 3 }}>
+        <div style={{ display: 'flex', gap: 5 }}>
           {dots.map((d) => (
             <span key={d.id} title={d.typeLabel + (d.note ? `: ${d.note}` : '')}
-              style={{ width: 9, height: 9, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
+              style={{ width: 15, height: 15, borderRadius: '50%', background: d.color, display: 'inline-block', boxShadow: '0 0 0 1.5px #fff' }} />
           ))}
         </div>
       )}
