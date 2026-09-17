@@ -23,17 +23,23 @@ export default function ClassroomView({ classId, onBack }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [layoutRows, setLayoutRows] = useState(4);
   const [layoutCols, setLayoutCols] = useState(4);
-  const [todayLessons, setTodayLessons] = useState([]);
+  const [scheduleAll, setScheduleAll] = useState(null);
+  const [dayLessons, setDayLessons] = useState([]);
+  const [viewDate, setViewDate] = useState(todayStr());
   const [error, setError] = useState('');
 
-  const date = todayStr();
-
-  async function loadLessonPeriod(period, subject) {
-    setLesson({ period, subject, date });
-    const lg = await api('lesson_get', { classId, date, period });
-    setTopic(lg.lesson?.topic || '');
+  async function loadLessonPeriod(period, subject, forDate = viewDate) {
+    setLesson({ period, subject, date: forDate });
+    const lg = await api('lesson_get', { classId, date: forDate, period });
+    let t = lg.lesson?.topic || '';
+    // בשיעור תפילה הנושא קבוע — לא צריך להזין כל פעם מחדש
+    if (!t && subject?.trim() === 'תפילה') {
+      t = 'תפילה';
+      await api('lesson_topic', { classId, date: forDate, period, topic: t });
+    }
+    setTopic(t);
     setTopicSaved(true);
-    const evt = await api('events_today', { date });
+    const evt = await api('events_today', { date: forDate });
     const group = evt.lessons.find((g) => g.classId === classId && g.period === period);
     setEvents(group ? group.events : []);
   }
@@ -49,33 +55,49 @@ export default function ClassroomView({ classId, onBack }) {
     setStudents(students);
     setLayoutRows(cls?.rows || 4);
     setLayoutCols(cls?.cols || 4);
-
-    // כל שיעורי היום של הכיתה הזו לפי מערכת השעות — כדי לאפשר גם הזנה
-    // לשיעור שכבר התקיים היום (למשל בהפסקה), לא רק לשיעור החי כרגע
-    const dow = new Date().getDay(); // 0=ראשון..6=שבת, תואם ל-date('w') ב-PHP
-    const today = schedule
-      .filter((e) => e.classId === classId && e.dayOfWeek === dow)
-      .sort((a, b) => a.period - b.period);
-    setTodayLessons(today);
-
-    const cur = await api('current_lesson', { classId });
-    let chosen = cur.lesson;
-    if (!chosen && today.length) {
-      const now = new Date();
-      const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const past = today.filter((e) => e.startTime <= nowStr);
-      chosen = past.length ? past[past.length - 1] : today[0];
-    }
-
-    if (chosen) await loadLessonPeriod(chosen.period, chosen.subject);
-    else setLesson(null);
+    setScheduleAll(schedule);
   }
 
   useEffect(() => {
     setError('');
+    setLesson(undefined);
     loadAll().catch((e) => setError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  // בכל שינוי תאריך צפייה (או אחרי טעינת מערכת השעות) — לחשב אילו שיעורים
+  // חלים על היום הזה, ולבחור ברירת מחדל: השיעור החי עכשיו (רק אם זה היום
+  // בפועל), אחרת השיעור האחרון שכבר התחיל, אחרת הראשון של אותו יום
+  useEffect(() => {
+    if (scheduleAll === null) return;
+    const dow = new Date(viewDate + 'T00:00:00').getDay(); // 0=ראשון..6=שבת, תואם ל-date('w') ב-PHP
+    const list = scheduleAll
+      .filter((e) => e.classId === classId && e.dayOfWeek === dow)
+      .sort((a, b) => a.period - b.period);
+    setDayLessons(list);
+
+    (async () => {
+      const isToday = viewDate === todayStr();
+      let chosen = null;
+      if (isToday) {
+        const cur = await api('current_lesson', { classId });
+        chosen = cur.lesson;
+      }
+      if (!chosen && list.length) {
+        if (isToday) {
+          const now = new Date();
+          const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const past = list.filter((e) => e.startTime <= nowStr);
+          chosen = past.length ? past[past.length - 1] : list[0];
+        } else {
+          chosen = list[0];
+        }
+      }
+      if (chosen) await loadLessonPeriod(chosen.period, chosen.subject, viewDate);
+      else setLesson(null);
+    })().catch((e) => setError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduleAll, viewDate, classId]);
 
   const studentsById = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
@@ -100,7 +122,7 @@ export default function ClassroomView({ classId, onBack }) {
 
   async function refreshEvents() {
     if (!lesson) return;
-    const evt = await api('events_today', { date: lesson.date || date });
+    const evt = await api('events_today', { date: lesson.date || viewDate });
     const group = evt.lessons.find((g) => g.classId === classId && g.period === lesson.period);
     setEvents(group ? group.events : []);
   }
@@ -144,10 +166,10 @@ export default function ClassroomView({ classId, onBack }) {
 
     if (!activeBucket) return;
     if (!studentId) return;
-    if (!lesson) { setError('אין שיעור מוגדר עכשיו במערכת השעות עבור כיתה זו'); return; }
+    if (!lesson) { setError('אין שיעור מוגדר ליום הזה במערכת השעות עבור כיתה זו'); return; }
 
     const { event } = await api('events_create', {
-      classId, studentId, type: activeBucket, date: lesson.date || date, period: lesson.period,
+      classId, studentId, type: activeBucket, date: lesson.date || viewDate, period: lesson.period,
     });
     await refreshEvents();
     setNoteEvent(event);
@@ -170,7 +192,7 @@ export default function ClassroomView({ classId, onBack }) {
 
   async function saveTopic() {
     if (!lesson) return;
-    await api('lesson_topic', { classId, date: lesson.date || date, period: lesson.period, topic });
+    await api('lesson_topic', { classId, date: lesson.date || viewDate, period: lesson.period, topic });
     setTopicSaved(true);
   }
 
@@ -210,8 +232,13 @@ export default function ClassroomView({ classId, onBack }) {
         <button className="pill-btn ghost" onClick={tryBack}>← כיתות</button>
         <h1 style={{ margin: 0, fontSize: '1.3rem' }}>{classData.name}</h1>
         <span style={{ opacity: 0.6, fontSize: '0.9rem' }}>
-          {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (todayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר להיום בכיתה זו')}
+          {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (dayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר ליום הזה בכיתה זו')}
         </span>
+        <input
+          type="date" value={viewDate}
+          onChange={(e) => setViewDate(e.target.value)}
+          style={{ marginInlineStart: 8 }}
+        />
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
           <button
             className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
@@ -226,21 +253,25 @@ export default function ClassroomView({ classId, onBack }) {
 
       {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
 
-      {todayLessons.length > 1 && (
+      {dayLessons.length > 1 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ alignSelf: 'center', opacity: 0.6, fontSize: '0.85rem' }}>שיעורי היום — להזנה גם שלא בזמן אמת:</span>
-          {todayLessons.map((e) => (
+          <span style={{ alignSelf: 'center', opacity: 0.6, fontSize: '0.85rem' }}>שיעורי היום הזה — להזנה גם שלא בזמן אמת:</span>
+          {dayLessons.map((e) => (
             <button
               key={e.period}
               className={`pill-btn ${lesson?.period === e.period ? '' : 'secondary'}`}
               style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-              onClick={() => loadLessonPeriod(e.period, e.subject)}
+              onClick={() => loadLessonPeriod(e.period, e.subject, viewDate)}
             >שיעור {e.period} · {e.subject}</button>
           ))}
         </div>
       )}
 
-      {lesson && (
+      {lesson && lesson.subject?.trim() === 'תפילה' && (
+        <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>נושא השיעור: תפילה (קבוע, לא צריך להזין)</div>
+      )}
+
+      {lesson && lesson.subject?.trim() !== 'תפילה' && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             type="text" placeholder="נושא השיעור"
