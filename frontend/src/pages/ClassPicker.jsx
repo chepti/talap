@@ -12,7 +12,7 @@ function CameraIcon() {
   );
 }
 
-export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onLogout }) {
+export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onOpenReports, onLogout }) {
   const bg = useAppBackground();
   const [classes, setClasses] = useState(null);
   const [newName, setNewName] = useState('');
@@ -96,6 +96,7 @@ export default function ClassPicker({ onPick, onOpenRoster, onOpenSchedule, onLo
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="pill-btn ghost" onClick={onOpenRoster}>ניהול תלמידים</button>
           <button className="pill-btn ghost" onClick={onOpenSchedule}>מערכת שעות</button>
+          <button className="pill-btn ghost" onClick={onOpenReports}>דוחות</button>
           <button className="pill-btn ghost" onClick={onLogout}>התנתקות</button>
         </div>
       </div>

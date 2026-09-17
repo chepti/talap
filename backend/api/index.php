@@ -84,6 +84,7 @@ function helpDoc() {
             'events_set_note' => 'POST — {id, note}. הוספת/עדכון הערה מילולית לאירוע קיים.',
             'events_delete'   => 'POST — {id} (ביטול סימון בטעות).',
             'events_today'    => 'GET — ?date=YYYY-MM-DD (ברירת מחדל היום) — כל האירועים+נושאי השיעור של התאריך, מקובצים לפי שיעור. זו הפעולה שמשימת הסנכרון למשו"ב קוראת.',
+            'events_range'    => 'GET — ?from=YYYY-MM-DD&to=YYYY-MM-DD&classId=?&studentId=? — כמו events_today אבל לטווח תאריכים, עם סינון אופציונלי לכיתה/תלמיד. משמש למסך הדוחות (ייצוא CSV, כרטיס תלמיד, מגמות).',
             'mark_synced'     => 'POST — {ids:[...]} מסמן אירועים כמוזנים במשו"ב.',
             'ops'             => 'POST — {ops:[{action,...}, ...]} — הרבה פעולות בבקשה אחת, הצלחה/כשל לכל אחת.',
         ],
@@ -516,6 +517,7 @@ function dispatch($action, $data) {
                     if ($l['classId'] === $e['classId'] && $l['date'] === $date && $l['period'] === $e['period']) { $topic = $l['topic']; break; }
                 }
                 $groups[$key] = [
+                    'date' => $date,
                     'classId' => $e['classId'],
                     'className' => $classNames[$e['classId']] ?? '',
                     'period' => $e['period'],
@@ -533,6 +535,49 @@ function dispatch($action, $data) {
         }
         ksort($groups);
         return ['date' => $date, 'lessons' => array_values($groups)];
+    }
+
+    case 'events_range': {
+        $from = $data['from'] ?? ($_GET['from'] ?? '');
+        $to = $data['to'] ?? ($_GET['to'] ?? '');
+        if (!$from || !$to) fail('from and to (YYYY-MM-DD) required');
+        $classId = ($data['classId'] ?? $_GET['classId'] ?? '') !== '' ? (int)($data['classId'] ?? $_GET['classId']) : null;
+        $studentId = ($data['studentId'] ?? $_GET['studentId'] ?? '') !== '' ? (int)($data['studentId'] ?? $_GET['studentId']) : null;
+
+        $events = storeRead('events');
+        $lessons = storeRead('lessons');
+        $classes = storeRead('classes');
+        $classNames = [];
+        foreach ($classes as $c) $classNames[$c['id']] = $c['name'];
+
+        $filtered = array_values(array_filter($events, function ($e) use ($from, $to, $classId, $studentId) {
+            if ($e['date'] < $from || $e['date'] > $to) return false;
+            if ($classId !== null && $e['classId'] !== $classId) return false;
+            if ($studentId !== null && $e['studentId'] !== $studentId) return false;
+            return true;
+        }));
+
+        $groups = []; // key: date|classId|period
+        foreach ($filtered as $e) {
+            $key = $e['date'] . '|' . $e['classId'] . '|' . $e['period'];
+            if (!isset($groups[$key])) {
+                $topic = '';
+                foreach ($lessons as $l) {
+                    if ($l['classId'] === $e['classId'] && $l['date'] === $e['date'] && $l['period'] === $e['period']) { $topic = $l['topic']; break; }
+                }
+                $groups[$key] = [
+                    'date' => $e['date'], 'classId' => $e['classId'], 'className' => $classNames[$e['classId']] ?? '',
+                    'period' => $e['period'], 'subject' => $e['subject'], 'topic' => $topic, 'events' => [],
+                ];
+            }
+            $groups[$key]['events'][] = [
+                'id' => $e['id'], 'studentId' => $e['studentId'], 'studentName' => $e['studentName'],
+                'type' => $e['type'], 'typeLabel' => EVENT_TYPES[$e['type']]['he'] ?? $e['type'],
+                'note' => $e['note'], 'ts' => $e['ts'], 'syncedToMashov' => $e['syncedToMashov'],
+            ];
+        }
+        ksort($groups);
+        return ['from' => $from, 'to' => $to, 'lessons' => array_values($groups)];
     }
 
     case 'mark_synced': {

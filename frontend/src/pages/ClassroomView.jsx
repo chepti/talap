@@ -35,7 +35,7 @@ function toggleFullscreen() {
   }
 }
 
-export default function ClassroomView({ classId, onBack, onSwitchClass }) {
+export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports }) {
   const [classData, setClassData] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -381,6 +381,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass }) {
             className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
             onClick={() => { setEditMode(editMode === 'layout' ? 'none' : 'layout'); setActiveBucket(null); }}
           >עריכת סידור שולחנות</button>
+          <button className="pill-btn ghost" onClick={onOpenReports}>דוחות</button>
           {editMode === 'layout' && (
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <label>שורות: <input type="text" inputMode="numeric" value={layoutRows} onChange={(e) => setLayoutRows(Number(e.target.value) || 1)} style={{ width: 50 }} /></label>
