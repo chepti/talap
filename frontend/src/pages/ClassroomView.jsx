@@ -23,14 +23,26 @@ export default function ClassroomView({ classId, onBack }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [layoutRows, setLayoutRows] = useState(4);
   const [layoutCols, setLayoutCols] = useState(4);
+  const [todayLessons, setTodayLessons] = useState([]);
   const [error, setError] = useState('');
 
   const date = todayStr();
 
+  async function loadLessonPeriod(period, subject) {
+    setLesson({ period, subject, date });
+    const lg = await api('lesson_get', { classId, date, period });
+    setTopic(lg.lesson?.topic || '');
+    setTopicSaved(true);
+    const evt = await api('events_today', { date });
+    const group = evt.lessons.find((g) => g.classId === classId && g.period === period);
+    setEvents(group ? group.events : []);
+  }
+
   async function loadAll() {
-    const [{ classes }, { students }] = await Promise.all([
+    const [{ classes }, { students }, { schedule }] = await Promise.all([
       api('classes_list'),
       api('students_list', { classId }),
+      api('schedule_list'),
     ]);
     const cls = classes.find((c) => c.id === classId);
     setClassData(cls);
@@ -38,18 +50,25 @@ export default function ClassroomView({ classId, onBack }) {
     setLayoutRows(cls?.rows || 4);
     setLayoutCols(cls?.cols || 4);
 
-    const cur = await api('current_lesson', { classId });
-    setLesson(cur.lesson ? { ...cur.lesson, date: cur.date, dayName: cur.dayName } : null);
+    // כל שיעורי היום של הכיתה הזו לפי מערכת השעות — כדי לאפשר גם הזנה
+    // לשיעור שכבר התקיים היום (למשל בהפסקה), לא רק לשיעור החי כרגע
+    const dow = new Date().getDay(); // 0=ראשון..6=שבת, תואם ל-date('w') ב-PHP
+    const today = schedule
+      .filter((e) => e.classId === classId && e.dayOfWeek === dow)
+      .sort((a, b) => a.period - b.period);
+    setTodayLessons(today);
 
-    if (cur.lesson) {
-      const lg = await api('lesson_get', { classId, date: cur.date, period: cur.lesson.period });
-      setTopic(lg.lesson?.topic || '');
-      setTopicSaved(true);
+    const cur = await api('current_lesson', { classId });
+    let chosen = cur.lesson;
+    if (!chosen && today.length) {
+      const now = new Date();
+      const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const past = today.filter((e) => e.startTime <= nowStr);
+      chosen = past.length ? past[past.length - 1] : today[0];
     }
 
-    const evt = await api('events_today', { date: cur.date || date });
-    const group = evt.lessons.find((g) => g.classId === classId && g.period === cur.lesson?.period);
-    setEvents(group ? group.events : []);
+    if (chosen) await loadLessonPeriod(chosen.period, chosen.subject);
+    else setLesson(null);
   }
 
   useEffect(() => {
@@ -191,7 +210,7 @@ export default function ClassroomView({ classId, onBack }) {
         <button className="pill-btn ghost" onClick={tryBack}>← כיתות</button>
         <h1 style={{ margin: 0, fontSize: '1.3rem' }}>{classData.name}</h1>
         <span style={{ opacity: 0.6, fontSize: '0.9rem' }}>
-          {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : 'אין שיעור כרגע לפי מערכת השעות'}
+          {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (todayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר להיום בכיתה זו')}
         </span>
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
           <button
@@ -206,6 +225,20 @@ export default function ClassroomView({ classId, onBack }) {
       </div>
 
       {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
+
+      {todayLessons.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ alignSelf: 'center', opacity: 0.6, fontSize: '0.85rem' }}>שיעורי היום — להזנה גם שלא בזמן אמת:</span>
+          {todayLessons.map((e) => (
+            <button
+              key={e.period}
+              className={`pill-btn ${lesson?.period === e.period ? '' : 'secondary'}`}
+              style={{ padding: '6px 16px', fontSize: '0.85rem' }}
+              onClick={() => loadLessonPeriod(e.period, e.subject)}
+            >שיעור {e.period} · {e.subject}</button>
+          ))}
+        </div>
+      )}
 
       {lesson && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
