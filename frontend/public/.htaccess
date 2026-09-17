@@ -1,0 +1,18 @@
+# קבצי המעטפת — לאמת מול השרת בכל טעינה, כדי שעדכוני קוד יתפשטו מיד
+<FilesMatch "\.(html|js|css|webmanifest)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</FilesMatch>
+
+<Files "sw.js">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</Files>
+
+<FilesMatch "\.(png|jpg|jpeg|svg|webp|ico)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=604800"
+  </IfModule>
+</FilesMatch>

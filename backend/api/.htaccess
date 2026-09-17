@@ -1,0 +1,4 @@
+# אף פעם לא להגיש את הקונפיג דרך HTTP
+<Files "config.php">
+    Require all denied
+</Files>

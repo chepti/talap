@@ -1,0 +1,17 @@
+{
+  "name": "תלפ — נוכחות כיתתית",
+  "short_name": "תלפ",
+  "description": "תיעוד נוכחות ומשמעת כיתתית",
+  "start_url": "/talap/",
+  "scope": "/talap/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f4ede1",
+  "theme_color": "#2f6f4f",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

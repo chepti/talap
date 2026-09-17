@@ -1,0 +1,9 @@
+# סודות — אף פעם לא ל-git. הקובץ האמיתי חי רק בשרת, מועלה ידנית ב-scp.
+backend/api/config.php
+
+# נתונים בשרת — נוצרים אוטומטית, לא חלק מהקוד
+backend/data/*.json
+
+# build/deps
+frontend/node_modules/
+frontend/dist/

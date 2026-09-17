@@ -1,0 +1,81 @@
+:root {
+  --color-bg: #f4ede1;
+  --color-ink: #2c2620;
+  --color-primary: #2f6f4f;
+  --color-primary-light: #eaf5ee;
+  --color-card: #ffffff;
+  --color-border: #e3d9c8;
+  --radius-pill: 999px;
+  --radius-card: 20px;
+
+  --color-late: #f5a623;
+  --color-absent: #9b59b6;
+  --color-positive: #2ecc71;
+  --color-disturb: #e74c3c;
+  --color-homework: #3498db;
+  --color-removal: #c0392b;
+  --color-noEquipment: #7f8c8d;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+.pill-btn {
+  border-radius: var(--radius-pill);
+  padding: 10px 22px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--color-primary);
+  color: #fff;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+.pill-btn:active { transform: scale(0.96); }
+.pill-btn.secondary {
+  background: var(--color-card);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+}
+.pill-btn.ghost {
+  background: transparent;
+  color: var(--color-ink);
+  opacity: 0.7;
+}
+.pill-btn:disabled { opacity: 0.4; cursor: default; }
+
+.card {
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  padding: 16px;
+}
+
+input[type="text"], input[type="password"], textarea, select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: #fff;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 10px; }
