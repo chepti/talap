@@ -17,6 +17,7 @@ export default function ClassroomView({ classId, onBack }) {
   const [activeBucket, setActiveBucket] = useState(null);
   const [editMode, setEditMode] = useState('none'); // none | seating | layout
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [selectedPoolStudent, setSelectedPoolStudent] = useState(null);
   const [noteEvent, setNoteEvent] = useState(null);
   const [noteText, setNoteText] = useState('');
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -59,6 +60,16 @@ export default function ClassroomView({ classId, onBack }) {
 
   const studentsById = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
+  const seatedStudentIds = useMemo(() => {
+    if (!classData) return new Set();
+    return new Set(classData.desks.flatMap((d) => d.seats).filter((s) => s !== null));
+  }, [classData]);
+
+  const unassignedStudents = useMemo(
+    () => students.filter((s) => !seatedStudentIds.has(s.id)),
+    [students, seatedStudentIds]
+  );
+
   const dotsByStudent = useMemo(() => {
     const map = {};
     for (const e of events) {
@@ -75,7 +86,23 @@ export default function ClassroomView({ classId, onBack }) {
     setEvents(group ? group.events : []);
   }
 
+  async function persistDesks(newDesks) {
+    setClassData({ ...classData, desks: newDesks });
+    await api('seating_update', { classId, desks: newDesks });
+  }
+
   async function handleSeatClick(deskId, seatIndex, studentId) {
+    if (selectedPoolStudent != null) {
+      // שיבוץ תלמיד/ה מהמחסן למקום הזה (מי שהיה שם, אם היה, פשוט חוזר להיות לא-משובץ)
+      const newDesks = classData.desks.map((d) => ({ ...d, seats: [...d.seats] }));
+      const target = newDesks.find((d) => d.id === deskId);
+      target.seats[seatIndex] = selectedPoolStudent;
+      setSelectedPoolStudent(null);
+      setSelectedSeat(null);
+      await persistDesks(newDesks);
+      return;
+    }
+
     if (editMode === 'seating') {
       if (!selectedSeat) {
         setSelectedSeat({ deskId, seatIndex });
@@ -91,9 +118,8 @@ export default function ClassroomView({ classId, onBack }) {
       const tmp = a.seats[selectedSeat.seatIndex];
       a.seats[selectedSeat.seatIndex] = b.seats[seatIndex];
       b.seats[seatIndex] = tmp;
-      setClassData({ ...classData, desks: newDesks });
       setSelectedSeat(null);
-      await api('seating_update', { classId, desks: newDesks });
+      await persistDesks(newDesks);
       return;
     }
 
@@ -107,6 +133,20 @@ export default function ClassroomView({ classId, onBack }) {
     await refreshEvents();
     setNoteEvent(event);
     setNoteText('');
+  }
+
+  function handlePoolClick(studentId) {
+    setSelectedSeat(null);
+    setSelectedPoolStudent((cur) => (cur === studentId ? null : studentId));
+  }
+
+  async function returnSelectedSeatToPool() {
+    if (!selectedSeat) return;
+    const newDesks = classData.desks.map((d) => ({ ...d, seats: [...d.seats] }));
+    const d = newDesks.find((x) => x.id === selectedSeat.deskId);
+    d.seats[selectedSeat.seatIndex] = null;
+    setSelectedSeat(null);
+    await persistDesks(newDesks);
   }
 
   async function saveTopic() {
@@ -156,7 +196,7 @@ export default function ClassroomView({ classId, onBack }) {
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
           <button
             className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
-            onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setActiveBucket(null); }}
+            onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setSelectedPoolStudent(null); setActiveBucket(null); }}
           >עריכת סידור ישיבה</button>
           <button
             className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
@@ -190,12 +230,31 @@ export default function ClassroomView({ classId, onBack }) {
 
       {editMode === 'none' && <EventBucketBar active={activeBucket} onSelect={setActiveBucket} />}
 
+      {editMode === 'seating' && (
+        <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, opacity: 0.7 }}>מחסן — תלמידים ללא מקום:</span>
+          {unassignedStudents.length === 0 && <span style={{ opacity: 0.5 }}>כולם משובצים</span>}
+          {unassignedStudents.map((s) => (
+            <button
+              key={s.id}
+              className="pill-btn secondary"
+              style={selectedPoolStudent === s.id ? { background: 'var(--color-primary)', color: '#fff' } : undefined}
+              onClick={() => handlePoolClick(s.id)}
+            >{s.fullName}</button>
+          ))}
+          {selectedSeat && (
+            <button className="pill-btn ghost" onClick={returnSelectedSeatToPool}>החזרת התלמיד/ה שנבחר/ה למחסן</button>
+          )}
+        </div>
+      )}
+
       <DeskGrid
         classData={classData}
         studentsById={studentsById}
         dotsByStudent={dotsByStudent}
         editMode={editMode === 'seating'}
         selectedSeat={selectedSeat}
+        selectedPool={selectedPoolStudent}
         onSeatClick={handleSeatClick}
       />
 

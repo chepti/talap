@@ -40,10 +40,10 @@ function Seat({ student, dots, selected, editMode, onClick }) {
   );
 }
 
-export default function Desk({ desk, studentsById, dotsByStudent, editMode, selectedSeat, onSeatClick }) {
+export default function Desk({ desk, totalRows, studentsById, dotsByStudent, editMode, selected, selectedPool, onSeatClick }) {
   return (
     <div style={{
-      gridRow: desk.row + 1, gridColumn: desk.col + 1,
+      gridRow: totalRows - desk.row, gridColumn: desk.col + 1,
       display: 'flex', gap: 4, background: '#efe3cd', borderRadius: 14, padding: 6,
       boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
     }}>
@@ -52,8 +52,8 @@ export default function Desk({ desk, studentsById, dotsByStudent, editMode, sele
           key={i}
           student={studentId ? studentsById[studentId] : null}
           dots={studentId ? dotsByStudent[studentId] : null}
-          editMode={editMode}
-          selected={selectedSeat && selectedSeat.deskId === desk.id && selectedSeat.seatIndex === i}
+          editMode={editMode || !!selectedPool}
+          selected={selected && selected.deskId === desk.id && selected.seatIndex === i}
           onClick={() => onSeatClick(desk.id, i, studentId)}
         />
       ))}
