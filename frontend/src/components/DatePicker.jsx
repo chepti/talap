@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { formatHebrewDate } from '../lib/hebrewDate';
 
 const DOW_HE = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש']; // יום א'..יום שבת, כמקובל בלוחות שנה עבריים
 
@@ -15,7 +16,7 @@ function fmtGregorian(d) {
 }
 function fmtHebrew(d) {
   try {
-    return new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+    return formatHebrewDate(d);
   } catch {
     return '';
   }

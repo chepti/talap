@@ -4,6 +4,7 @@ import { todayStr } from '../lib/date';
 import { downloadCsv, copyTsv, lessonsToRows } from '../lib/csv';
 import DatePicker from '../components/DatePicker';
 import { EVENT_TYPES } from '../components/EventBucketBar';
+import { formatHebrewDate } from '../lib/hebrewDate';
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
 
@@ -239,8 +240,7 @@ function circleSize(count) {
 
 function hebrewRange(firstDate, lastDate) {
   try {
-    const fmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' });
-    return `${fmt.format(firstDate)} – ${fmt.format(lastDate)}`;
+    return `${formatHebrewDate(firstDate)} – ${formatHebrewDate(lastDate)}`;
   } catch { return ''; }
 }
 
