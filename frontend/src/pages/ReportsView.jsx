@@ -234,7 +234,71 @@ function StudentCard({ classes }) {
 }
 
 function circleSize(count) {
-  return 16 + Math.min(count, 6) * 5;
+  return 13 + Math.min(count, 6) * 3;
+}
+
+function hebrewRange(firstDate, lastDate) {
+  try {
+    const fmt = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${fmt.format(firstDate)} – ${fmt.format(lastDate)}`;
+  } catch { return ''; }
+}
+
+function MonthGrid({ y, m, countsByDay, current, onPickInfo }) {
+  const first = new Date(y, m, 1);
+  const lastDate = new Date(y, m + 1, 0);
+  const startDow = first.getDay();
+  const daysInMonth = lastDate.getDate();
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const monthLabel = new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' }).format(first);
+
+  return (
+    <div className="card" style={{ border: current ? '2px solid var(--color-primary)' : undefined }}>
+      <div style={{ textAlign: 'center', marginBottom: 4 }}>
+        <div style={{ fontWeight: 700 }}>{monthLabel}</div>
+        <div style={{ fontSize: '0.75rem', opacity: 0.55 }}>{hebrewRange(first, lastDate)}</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, textAlign: 'center', fontSize: '0.8rem', opacity: 0.6, margin: '8px 0 4px' }}>
+        {['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'].map((d) => <div key={d}>{d}</div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: 64, gap: 4 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const dayCounts = countsByDay[dateStr] || {};
+          const present = EVENT_TYPES.filter((t) => dayCounts[t.key]);
+          return (
+            <div key={i} style={{
+              borderRadius: 10, padding: '3px 2px', overflow: 'hidden',
+              background: '#fdfaf3', border: '1px solid var(--color-border)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            }}>
+              <span style={{ fontSize: '0.68rem', opacity: 0.5 }}>{day}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                {present.map((t) => {
+                  const size = circleSize(dayCounts[t.key]);
+                  return (
+                    <button
+                      key={t.key}
+                      title={`${dateStr} · ${t.label}: ${dayCounts[t.key]}`}
+                      onClick={() => onPickInfo(`${dateStr} · ${t.label}: ${dayCounts[t.key]}`)}
+                      style={{
+                        width: size, height: size, borderRadius: '50%', background: t.color, border: 'none', padding: 0,
+                        color: '#fff', fontSize: size > 20 ? '0.65rem' : '0.55rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}
+                    >{dayCounts[t.key]}</button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function Trends({ classes }) {
@@ -242,9 +306,21 @@ function Trends({ classes }) {
   const [students, setStudents] = useState([]);
   const [studentFilter, setStudentFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
-  const [countsByDay, setCountsByDay] = useState({});
+  const [countsByMonth, setCountsByMonth] = useState({}); // "y-m" -> {date: {type: count}}
+  const [info, setInfo] = useState('');
   const [error, setError] = useState('');
+
+  const months = useMemo(() => {
+    const now = new Date();
+    const startY = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+    const list = [];
+    let y = startY, m = 8; // ספטמבר
+    while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth())) {
+      list.push({ y, m });
+      m++; if (m > 11) { m = 0; y++; }
+    }
+    return list;
+  }, []);
 
   useEffect(() => {
     setStudentFilter('');
@@ -253,37 +329,29 @@ function Trends({ classes }) {
   }, [classFilter]);
 
   useEffect(() => {
-    const first = `${month.y}-${String(month.m + 1).padStart(2, '0')}-01`;
-    const lastDay = new Date(month.y, month.m + 1, 0).getDate();
-    const last = `${month.y}-${String(month.m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    api('events_range', { from: first, to: last, classId: classFilter || undefined, studentId: studentFilter || undefined })
+    const from = `${months[0].y}-${String(months[0].m + 1).padStart(2, '0')}-01`;
+    const lastM = months[months.length - 1];
+    const lastDay = new Date(lastM.y, lastM.m + 1, 0).getDate();
+    const to = `${lastM.y}-${String(lastM.m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    api('events_range', { from, to, classId: classFilter || undefined, studentId: studentFilter || undefined })
       .then((r) => {
-        const byDay = {};
+        const byMonth = {};
         for (const g of r.lessons) {
           for (const e of g.events) {
             if (typeFilter && e.type !== typeFilter) continue;
-            if (!byDay[g.date]) byDay[g.date] = {};
-            byDay[g.date][e.type] = (byDay[g.date][e.type] || 0) + 1;
+            const [y, m] = g.date.split('-');
+            const key = `${Number(y)}-${Number(m) - 1}`;
+            if (!byMonth[key]) byMonth[key] = {};
+            if (!byMonth[key][g.date]) byMonth[key][g.date] = {};
+            byMonth[key][g.date][e.type] = (byMonth[key][g.date][e.type] || 0) + 1;
           }
         }
-        setCountsByDay(byDay);
+        setCountsByMonth(byMonth);
       })
       .catch((e) => setError(e.message));
-  }, [classFilter, studentFilter, typeFilter, month]);
+  }, [classFilter, studentFilter, typeFilter, months]);
 
-  const first = new Date(month.y, month.m, 1);
-  const startDow = first.getDay();
-  const daysInMonth = new Date(month.y, month.m + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  const monthLabel = new Intl.DateTimeFormat('he-IL', { month: 'long', year: 'numeric' }).format(first);
-
-  function changeMonth(delta) {
-    let m = month.m + delta, y = month.y;
-    if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
-    setMonth({ y, m });
-  }
+  const now = new Date();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -304,46 +372,23 @@ function Trends({ classes }) {
 
       {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
 
-      <div className="card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <button className="pill-btn ghost" onClick={() => changeMonth(-1)}>‹</button>
-          <span style={{ fontWeight: 700 }}>{monthLabel}</span>
-          <button className="pill-btn ghost" onClick={() => changeMonth(1)}>›</button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4, textAlign: 'center', fontSize: '0.8rem', opacity: 0.6, marginBottom: 4 }}>
-          {['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'].map((d) => <div key={d}>{d}</div>)}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 4 }}>
-          {cells.map((day, i) => {
-            if (!day) return <div key={i} />;
-            const dateStr = `${month.y}-${String(month.m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const dayCounts = countsByDay[dateStr] || {};
-            const hasAny = Object.keys(dayCounts).length > 0;
-            return (
-              <div key={i} style={{
-                borderRadius: 10, padding: '4px 2px', minHeight: 62,
-                background: '#fdfaf3', border: '1px solid var(--color-border)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-              }}>
-                <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{day}</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
-                  {hasAny ? EVENT_TYPES.filter((t) => dayCounts[t.key]).map((t) => {
-                    const size = circleSize(dayCounts[t.key]);
-                    return (
-                      <div key={t.key} title={`${t.label}: ${dayCounts[t.key]}`} style={{
-                        width: size, height: size, borderRadius: '50%', background: t.color,
-                        color: '#fff', fontSize: size > 22 ? '0.7rem' : '0.6rem', fontWeight: 700,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>{dayCounts[t.key]}</div>
-                    );
-                  }) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {info && <div className="card" style={{ fontWeight: 600, textAlign: 'center' }}>{info}</div>}
+
+      <div
+        ref={(el) => { if (el && !el.dataset.scrolled) { el.scrollTop = el.scrollHeight; el.dataset.scrolled = '1'; } }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '65vh', overflowY: 'auto', padding: 2 }}
+      >
+        <div style={{ textAlign: 'center', opacity: 0.5, fontSize: '0.8rem' }}>↑ חודשים קודמים למעלה, לגלול להשוואה</div>
+        {months.map(({ y, m }) => (
+          <MonthGrid
+            key={`${y}-${m}`} y={y} m={m}
+            countsByDay={countsByMonth[`${y}-${m}`] || {}}
+            current={y === now.getFullYear() && m === now.getMonth()}
+            onPickInfo={setInfo}
+          />
+        ))}
       </div>
-      <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>כל עיגול הוא סוג אירוע — הגודל גדל לפי כמות האירועים מאותו סוג באותו יום.</div>
+      <div style={{ opacity: 0.6, fontSize: '0.85rem' }}>כל עיגול הוא סוג אירוע — הגודל גדל לפי כמות האירועים מאותו סוג באותו יום. לחיצה על עיגול מציגה פירוט למעלה.</div>
     </div>
   );
 }
