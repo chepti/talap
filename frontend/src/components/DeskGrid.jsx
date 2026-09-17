@@ -1,6 +1,6 @@
 import Desk from './Desk';
 
-export default function DeskGrid({ classData, studentsById, dotsByStudent, editMode, selectedSeat, selectedPool, onSeatClick }) {
+export default function DeskGrid({ classData, studentsById, dotsByStudent, editMode, selectedSeat, selectedPool, onSeatClick, toolbar }) {
   const { rows, cols, desks } = classData;
   return (
     <div style={{
@@ -9,6 +9,14 @@ export default function DeskGrid({ classData, studentsById, dotsByStudent, editM
       display: 'flex', flexDirection: 'column',
       boxShadow: 'inset 0 0 30px rgba(0,0,0,0.12)',
     }}>
+      {toolbar && (
+        <div style={{
+          background: 'rgba(255,255,255,0.35)', borderRadius: 14, padding: '4px 6px', marginBottom: 12,
+          alignSelf: 'flex-start',
+        }}>
+          {toolbar}
+        </div>
+      )}
       <div style={{
         display: 'grid', flex: 1,
         gridTemplateRows: `repeat(${rows}, 1fr)`,

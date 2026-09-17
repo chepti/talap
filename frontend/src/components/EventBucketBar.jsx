@@ -11,29 +11,43 @@ const TYPES = [
 export { TYPES as EVENT_TYPES };
 export const EDIT_KEY = '__edit__';
 
-function BucketIcon() {
+function BucketObject({ color, lifted }) {
+  const gid = 'bg-' + color.replace(/[^a-zA-Z0-9]/g, '');
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 4c0-1.8 2.5-2.5 4-2.5s4 .7 4 2.5" />
-      <path d="M5 4h14l-1.7 15.3a2 2 0 0 1-2 1.7H8.7a2 2 0 0 1-2-1.7L5 4Z" />
-      <path d="M5.6 10h12.8" />
+    <svg width="46" height="54" viewBox="0 0 46 54" style={{ transform: lifted ? 'translateY(-4px)' : 'none', transition: 'transform 0.15s ease' }}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={color} stopOpacity="0.55" />
+          <stop offset="1" stopColor={color} />
+        </linearGradient>
+      </defs>
+      <ellipse cx="23" cy="49" rx="14" ry="3.4" fill="rgba(40,25,10,0.25)" />
+      <path d="M12 10c0-3.6 4.9-5.2 11-5.2S34 6.4 34 10" fill="none" stroke="#9b7a55" strokeWidth="3" strokeLinecap="round" />
+      <path d="M9 12h28l-3.4 30a3.4 3.4 0 0 1-3.4 3H15.8a3.4 3.4 0 0 1-3.4-3L9 12Z" fill="#fffaf0" stroke="#d8cbb0" strokeWidth="1.5" />
+      <path d="M10.4 15.5h25.2" stroke="#d8cbb0" strokeWidth="1.2" />
+      <path d="M10.6 15.5c0 3.6 5.6 5.5 12.4 5.5s12.4-1.9 12.4-5.5" fill={`url(#${gid})`} />
+      <path d="M19 20c-1.3 4-3.6 6.8-2.6 10.8 1 4 5.6 4 6.4 0 .6-3-1.6-5.6-1.4-8.6" fill={color} />
     </svg>
   );
 }
 
-function EditIcon() {
+function EditObject() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    <svg width="46" height="54" viewBox="0 0 46 54">
+      <ellipse cx="23" cy="49" rx="14" ry="3.4" fill="rgba(40,25,10,0.25)" />
+      <rect x="10" y="10" width="26" height="34" rx="4" fill="#fff" stroke="#d8cbb0" strokeWidth="1.5" transform="rotate(-6 23 27)" />
+      <path d="M15 20h14M15 27h14M15 34h9" stroke="#cfc3ab" strokeWidth="2" strokeLinecap="round" transform="rotate(-6 23 27)" />
+      <path d="M27 33 39 15l3 2-11 19-4.5 1.5Z" fill="#f2b134" stroke="#8a5a1e" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M39 15l3 2" stroke="#8a5a1e" strokeWidth="1.3" />
     </svg>
   );
 }
 
 export default function EventBucketBar({ active, onSelect }) {
+  const items = [...TYPES, { key: EDIT_KEY, label: 'עריכת סימון', color: '#8a7a63', edit: true }];
   return (
-    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '10px 0', alignItems: 'center' }}>
-      {TYPES.map((t) => {
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'flex-end', padding: '4px 8px' }}>
+      {items.map((t) => {
         const isActive = active === t.key;
         return (
           <button
@@ -41,43 +55,21 @@ export default function EventBucketBar({ active, onSelect }) {
             onClick={() => onSelect(isActive ? null : t.key)}
             title={t.label}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              borderRadius: 'var(--radius-pill)', padding: '10px 18px',
-              background: isActive ? t.color : '#fff',
-              color: isActive ? '#fff' : 'var(--color-ink)',
-              border: `2px solid ${t.color}`,
-              fontWeight: 600, fontSize: '0.95rem',
-              boxShadow: isActive ? '0 3px 10px rgba(0,0,0,0.18)' : 'none',
-              transform: isActive ? 'translateY(-2px)' : 'none',
-              transition: 'all 0.15s ease',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              background: 'transparent', border: 'none', padding: '4px 8px', width: 68,
             }}
           >
-            <BucketIcon />
-            {t.label}
+            {t.edit ? <EditObject /> : <BucketObject color={t.color} lifted={isActive} />}
+            <span style={{
+              fontSize: '0.68rem', fontWeight: 700, color: isActive ? t.color : '#5a4a35',
+              background: isActive ? '#fff' : 'transparent',
+              padding: isActive ? '1px 8px' : 0, borderRadius: 'var(--radius-pill)',
+              boxShadow: isActive ? '0 1px 4px rgba(0,0,0,0.2)' : 'none',
+              whiteSpace: 'nowrap',
+            }}>{t.label}</span>
           </button>
         );
       })}
-
-      <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--color-border)', margin: '0 4px' }} />
-
-      <button
-        onClick={() => onSelect(active === EDIT_KEY ? null : EDIT_KEY)}
-        title="עריכת סימון"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          borderRadius: 'var(--radius-pill)', padding: '10px 18px',
-          background: active === EDIT_KEY ? '#555' : '#fff',
-          color: active === EDIT_KEY ? '#fff' : '#555',
-          border: '2px solid #555',
-          fontWeight: 600, fontSize: '0.95rem',
-          boxShadow: active === EDIT_KEY ? '0 3px 10px rgba(0,0,0,0.18)' : 'none',
-          transform: active === EDIT_KEY ? 'translateY(-2px)' : 'none',
-          transition: 'all 0.15s ease',
-        }}
-      >
-        <EditIcon />
-        עריכת סימון
-      </button>
     </div>
   );
 }
