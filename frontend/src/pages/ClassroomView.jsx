@@ -3,9 +3,29 @@ import { api } from '../lib/api';
 import { todayStr } from '../lib/date';
 import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, DELETE_KEY } from '../components/EventBucketBar';
+import DatePicker from '../components/DatePicker';
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
 const LABEL_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.label]));
+
+function MaximizeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
 
 export default function ClassroomView({ classId, onBack }) {
   const [classData, setClassData] = useState(null);
@@ -252,11 +272,7 @@ export default function ClassroomView({ classId, onBack }) {
         <span style={{ opacity: 0.6, fontSize: '0.9rem' }}>
           {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (dayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר ליום הזה בכיתה זו')}
         </span>
-        <input
-          type="date" value={viewDate}
-          onChange={(e) => setViewDate(e.target.value)}
-          style={{ marginInlineStart: 8 }}
-        />
+        <DatePicker value={viewDate} onChange={setViewDate} />
         <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8 }}>
           <button
             className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
@@ -266,6 +282,9 @@ export default function ClassroomView({ classId, onBack }) {
             className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
             onClick={() => { setEditMode(editMode === 'layout' ? 'none' : 'layout'); setActiveBucket(null); }}
           >עריכת סידור שולחנות</button>
+          <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא">
+            <MaximizeIcon />
+          </button>
         </div>
       </div>
 
@@ -346,7 +365,7 @@ export default function ClassroomView({ classId, onBack }) {
           display: 'flex', gap: 8, alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', zIndex: 20,
         }}>
           <span>{LABEL_BY_TYPE[noteEvent.type]} — {noteEvent.studentName}: להוסיף הערה?</span>
-          <input type="text" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="הערה (אופציונלי)" autoFocus />
+          <input type="text" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="הערה (אופציונלי)" />
           <button className="pill-btn" onClick={saveNote}>שמירה</button>
           <button className="pill-btn ghost" onClick={() => setNoteEvent(null)}>דילוג</button>
         </div>
