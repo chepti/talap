@@ -66,7 +66,7 @@ function helpDoc() {
             'help'            => 'GET — המסמך הזה, בלי אימות.',
             'state'           => 'GET — תמונת מצב קומפקטית: כיתות, כמה אירועים היום, כמה עדיין לא סונכרנו.',
             'classes_list'    => 'GET — כל הכיתות כולל סידור שולחנות/ישיבה.',
-            'classes_upsert'  => 'POST — {id?, name, rows?, cols?}. בלי id = יצירה (ברירת מחדל 4x4 שולחנות, 2 מקומות לשולחן).',
+            'classes_upsert'  => 'POST — {id?, name, rows?, cols?, photoUrl?}. בלי id = יצירה (ברירת מחדל 4x4 שולחנות, 2 מקומות לשולחן).',
             'classes_delete'  => 'POST — {id}.',
             'seating_update'  => 'POST — {classId, desks:[{id,row,col,seats:[studentId|null, studentId|null]}]} — מחליף את כל פריסת השולחנות/ישיבה של הכיתה.',
             'students_list'   => 'GET — ?classId=N (אופציונלי, ברירת מחדל כולם).',
@@ -74,6 +74,7 @@ function helpDoc() {
             'students_delete' => 'POST — {id}.',
             'students_import' => 'POST — {classId, rows:[{fullName, mashovMatch?}, ...]} ייבוא בכמות (מאקסל/הדבקה), משבץ אוטומטית למקומות ריקים.',
             'photo_upload'    => 'POST — {studentId, imageBase64}. imageBase64 = data URL או base64 גולמי של תמונה מרובעת קטנה (JPEG). שומר ומעדכן photoUrl.',
+            'class_photo_upload' => 'POST — {classId, imageBase64}. תמונה לכרטיס הכיתה במסך בחירת כיתה בלבד (photoUrl על הכיתה).',
             'schedule_list'   => 'GET — מערכת השעות השבועית הקבועה.',
             'schedule_set'    => 'POST — {entries:[{dayOfWeek(0=ראשון..6=שבת), period, startTime(HH:MM), endTime(HH:MM), classId, subject, mashovSubjectLabel?}]} — מחליף את כל המערכת.',
             'current_lesson'  => 'GET — ?classId=N&at=ISO(אופציונלי, ברירת מחדל עכשיו) — איזה שיעור (period+subject) פעיל כרגע לפי מערכת השעות.',
@@ -202,6 +203,7 @@ function dispatch($action, $data) {
                 foreach ($classes as &$c) {
                     if ($c['id'] === $id) {
                         if (isset($data['name'])) $c['name'] = $data['name'];
+                        if (array_key_exists('photoUrl', $data)) $c['photoUrl'] = $data['photoUrl'];
                         $result = $c;
                         return $classes;
                     }
@@ -342,6 +344,36 @@ function dispatch($action, $data) {
         });
         if (!$result) fail("student #$studentId not found", 404);
         return ['student' => $result];
+    }
+
+    case 'class_photo_upload': {
+        $classId = (int)($data['classId'] ?? 0);
+        $imageBase64 = $data['imageBase64'] ?? '';
+        if (!$classId) fail('classId required');
+        if (!$imageBase64) fail('imageBase64 required');
+        if (preg_match('/^data:image\/\w+;base64,/', $imageBase64)) {
+            $imageBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $imageBase64);
+        }
+        $binary = base64_decode($imageBase64, true);
+        if ($binary === false) fail('invalid base64 image data');
+        if (strlen($binary) > 3 * 1024 * 1024) fail('image too large (max 3MB)', 413);
+
+        global $DATA_DIR;
+        $photosDir = dirname($DATA_DIR) . '/photos';
+        if (!is_dir($photosDir)) mkdir($photosDir, 0775, true);
+        $filename = 'class_' . $classId . '.jpg';
+        file_put_contents($photosDir . '/' . $filename, $binary);
+
+        $publicPath = 'backend/photos/' . $filename . '?v=' . time();
+        $result = null;
+        storeUpdate('classes', [], function ($classes) use ($classId, $publicPath, &$result) {
+            foreach ($classes as &$c) {
+                if ($c['id'] === $classId) { $c['photoUrl'] = $publicPath; $result = $c; break; }
+            }
+            return $classes;
+        });
+        if (!$result) fail("class #$classId not found", 404);
+        return ['class' => $result];
     }
 
     case 'schedule_list':
