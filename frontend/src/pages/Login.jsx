@@ -33,8 +33,11 @@ export default function Login({ onSuccess }) {
       <form onSubmit={submit} className="card" style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 8px 30px rgba(0,0,0,0.15)' }}>
         <h1 style={{ margin: 0, fontSize: '1.4rem', textAlign: 'center' }}>תלפ</h1>
         <p style={{ margin: 0, textAlign: 'center', opacity: 0.7 }}>הזני את מפתח הכניסה</p>
+        {/* שם משתמש קבוע ונסתר: כדי שהדפדפן ישמור את המפתח בנפרד משאר האפליקציות ב-chepti.com */}
+        <input type="text" name="username" autoComplete="username" value="talap" readOnly style={{ display: 'none' }} />
         <input
           type="password"
+          autoComplete="current-password"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="מפתח כניסה"
