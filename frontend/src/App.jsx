@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, getKey, clearKey } from './lib/api';
+import { startSync, clearLocalData, pendingCount } from './lib/offline';
+import SyncBadge from './components/SyncBadge';
 import Login from './pages/Login';
 import ClassPicker from './pages/ClassPicker';
 import ClassroomView from './pages/ClassroomView';
@@ -42,6 +44,7 @@ export default function App() {
     if (!loggedIn) { setCheckingAutoOpen(false); return; }
     (async () => {
       try {
+        await startSync(); // מיידי אם כבר יש עותק מקומי; בהפעלה ראשונה ממתין לנתונים מהשרת
         const { schedule } = await api('schedule_list');
         const now = new Date();
         const dow = now.getDay();
@@ -65,14 +68,17 @@ export default function App() {
     window.location.href = 'mailto:chepti@gmail.com?subject=' + encodeURIComponent('משוב על תלפ');
   }
 
-  function logout() {
+  async function logout() {
+    if (pendingCount() > 0 && !window.confirm(`יש ${pendingCount()} פעולות שעוד לא סונכרנו לשרת, והן יימחקו אם תתנתקי עכשיו. להתנתק בכל זאת?`)) return;
     clearKey();
+    await clearLocalData();
     setLoggedIn(false);
     setView('picker');
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <SyncBadge />
       <div style={{ flex: 1, minHeight: 0 }}>
         {view === 'picker' && (
           <ClassPicker

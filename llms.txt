@@ -23,6 +23,11 @@
 - `POST ?action=mark_synced` — לאחר שהזנה למשו"ב הצליחה: `{"ids":[...]}`
 - `POST ?action=ops` — הרבה פעולות בבקשה אחת: `{"ops":[{"action":"events_create",...}, ...]}`
 
+## עבודה אופליין (האפליקציה)
+- `GET ?action=snapshot` — כל הנתונים בבת אחת (`?parts=classes,students` לחלק מהם). האפליקציה שומרת עותק מקומי ושולחת פעולות שנרשמו אופליין כשהחיבור חוזר.
+- `events_create` מקבל גם `clientId` (שליחה חוזרת לא יוצרת כפילות) ו-`ts` (זמן האירוע בפועל, `YYYY-MM-DD HH:MM:SS`).
+  `events_delete` / `events_set_note` מקבלים `clientId` במקום `id`.
+
 ## סוגי אירועים
 late (איחור) · absent (חיסור) · positive (חיזוק חיובי) · disturb (הפרעה) ·
 homework (לא הכין שיעורי בית) · removal (הרחקה משיעור) · noEquipment (ללא ציוד)

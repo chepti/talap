@@ -84,7 +84,8 @@ function helpDoc() {
             'events_set_note' => 'POST — {id, note}. הוספת/עדכון הערה מילולית לאירוע קיים.',
             'events_delete'   => 'POST — {id} (ביטול סימון בטעות).',
             'events_today'    => 'GET — ?date=YYYY-MM-DD (ברירת מחדל היום) — כל האירועים+נושאי השיעור של התאריך, מקובצים לפי שיעור. זו הפעולה שמשימת הסנכרון למשו"ב קוראת.',
-            'events_range'    => 'GET — ?from=YYYY-MM-DD&to=YYYY-MM-DD&classId=?&studentId=? — כמו events_today אבל לטווח תאריכים, עם סינון אופציונלי לכיתה/תלמיד. משמש למסך הדוחות (ייצוא CSV, כרטיס תלמיד, מגמות).',
+            'snapshot'        => 'GET — כל הנתונים (כיתות, תלמידים, מערכת, אירועים, נושאי שיעור) בבת אחת. האפליקציה משתמשת בזה כעותק מקומי לעבודה אופליין. events_create מקבל גם clientId (מונע כפילויות בשליחה חוזרת) ו-ts (זמן האירוע בפועל, "YYYY-MM-DD HH:MM:SS").',
+            'events_range'    =>'GET — ?from=YYYY-MM-DD&to=YYYY-MM-DD&classId=?&studentId=? — כמו events_today אבל לטווח תאריכים, עם סינון אופציונלי לכיתה/תלמיד. משמש למסך הדוחות (ייצוא CSV, כרטיס תלמיד, מגמות).',
             'mark_synced'     => 'POST — {ids:[...]} מסמן אירועים כמוזנים במשו"ב.',
             'ops'             => 'POST — {ops:[{action,...}, ...]} — הרבה פעולות בבקשה אחת, הצלחה/כשל לכל אחת.',
         ],
@@ -454,11 +455,21 @@ function dispatch($action, $data) {
         $schedule = storeRead('schedule');
         $lesson = null;
         foreach ($schedule as $e) { if ($e['classId'] == $classId && $e['period'] == $period) { $lesson = $e; break; } }
+        // clientId = מזהה שנוצר בצד הלקוח (עבודה אופליין) — מבטיח שניסיון שליחה חוזר לא ייצור כפילות.
+        // ts = זמן האירוע בפועל כפי שנרשם במכשיר (חשוב כשהסנכרון קורה מאוחר יותר).
+        $clientId = isset($data['clientId']) ? substr((string)$data['clientId'], 0, 64) : '';
+        $ts = (isset($data['ts']) && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)$data['ts'])) ? $data['ts'] : date('Y-m-d H:i:s');
         $result = null;
-        storeUpdate('events', [], function ($events) use ($classId, $student, $type, $date, $period, $data, $lesson, &$result) {
+        storeUpdate('events', [], function ($events) use ($classId, $student, $type, $date, $period, $data, $lesson, $clientId, $ts, &$result) {
+            if ($clientId !== '') {
+                foreach ($events as $ex) {
+                    if (($ex['clientId'] ?? '') === $clientId) { $result = $ex; return $events; }
+                }
+            }
             $new = [
                 'id' => nextId($events),
-                'ts' => date('Y-m-d H:i:s'),
+                'clientId' => $clientId,
+                'ts' => $ts,
                 'classId' => $classId,
                 'studentId' => $student['id'],
                 'studentName' => $student['fullName'],
@@ -478,25 +489,42 @@ function dispatch($action, $data) {
 
     case 'events_set_note': {
         $id = (int)($data['id'] ?? 0);
+        $clientId = (string)($data['clientId'] ?? '');
         $note = $data['note'] ?? '';
-        if (!$id) fail('id required');
+        if (!$id && $clientId === '') fail('id or clientId required');
         $result = null;
-        storeUpdate('events', [], function ($events) use ($id, $note, &$result) {
+        storeUpdate('events', [], function ($events) use ($id, $clientId, $note, &$result) {
             foreach ($events as &$e) {
-                if ($e['id'] === $id) { $e['note'] = $note; $result = $e; break; }
+                if (($id && $e['id'] === $id) || ($clientId !== '' && ($e['clientId'] ?? '') === $clientId)) { $e['note'] = $note; $result = $e; break; }
             }
             return $events;
         });
-        if (!$result) fail("event #$id not found", 404);
+        if (!$result) fail('event not found', 404);
         return ['event' => $result];
     }
 
     case 'events_delete': {
         $id = (int)($data['id'] ?? 0);
-        storeUpdate('events', [], function ($events) use ($id) {
-            return array_values(array_filter($events, function ($e) use ($id) { return $e['id'] !== $id; }));
+        $clientId = (string)($data['clientId'] ?? '');
+        storeUpdate('events', [], function ($events) use ($id, $clientId) {
+            return array_values(array_filter($events, function ($e) use ($id, $clientId) {
+                if ($id && $e['id'] === $id) return false;
+                if ($clientId !== '' && ($e['clientId'] ?? '') === $clientId) return false;
+                return true;
+            }));
         });
-        return ['deleted' => $id];
+        return ['deleted' => $id ?: $clientId];
+    }
+
+    case 'snapshot': {
+        // כל הנתונים בבת אחת — לעבודה אופליין באפליקציה (עותק מקומי שמתעדכן מהשרת)
+        // parts (אופציונלי, מופרד בפסיקים) — למשוך רק חלק מהנתונים, למשל "classes,students"
+        $partsRaw = (string)($data['parts'] ?? $_GET['parts'] ?? '');
+        $all = ['classes', 'students', 'schedule', 'events', 'lessons'];
+        $want = $partsRaw === '' ? $all : array_values(array_intersect($all, explode(',', $partsRaw)));
+        $out = ['now' => date('Y-m-d H:i:s')];
+        foreach ($want as $p) $out[$p] = storeRead($p);
+        return $out;
     }
 
     case 'events_today': {
@@ -527,7 +555,7 @@ function dispatch($action, $data) {
                 ];
             }
             $groups[$key]['events'][] = [
-                'id' => $e['id'], 'studentId' => $e['studentId'], 'studentName' => $e['studentName'],
+                'id' => $e['id'], 'clientId' => $e['clientId'] ?? '', 'studentId' => $e['studentId'], 'studentName' => $e['studentName'],
                 'type' => $e['type'], 'typeLabel' => EVENT_TYPES[$e['type']]['he'] ?? $e['type'],
                 'note' => $e['note'], 'ts' => $e['ts'], 'syncedToMashov' => $e['syncedToMashov'],
                 'carryOverToNextLesson' => !in_array($e['type'], NON_CARRYOVER_TYPES, true),
@@ -571,7 +599,7 @@ function dispatch($action, $data) {
                 ];
             }
             $groups[$key]['events'][] = [
-                'id' => $e['id'], 'studentId' => $e['studentId'], 'studentName' => $e['studentName'],
+                'id' => $e['id'], 'clientId' => $e['clientId'] ?? '', 'studentId' => $e['studentId'], 'studentName' => $e['studentName'],
                 'type' => $e['type'], 'typeLabel' => EVENT_TYPES[$e['type']]['he'] ?? $e['type'],
                 'note' => $e['note'], 'ts' => $e['ts'], 'syncedToMashov' => $e['syncedToMashov'],
             ];

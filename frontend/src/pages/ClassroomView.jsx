@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import { useSyncVersion } from '../lib/offline';
 import { todayStr } from '../lib/date';
 import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
@@ -98,6 +99,21 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     loadAll().catch((e) => setError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  // כשהעותק המקומי הוחלף בנתונים חדשים מהשרת (סנכרון ברקע / חזרת חיבור) — מרעננים את מה שמוצג
+  const syncVersion = useSyncVersion();
+  useEffect(() => {
+    if (syncVersion === 0 || scheduleAll === null) return;
+    (async () => {
+      const [{ classes }, { students }] = await Promise.all([api('classes_list'), api('students_list', { classId })]);
+      const cls = classes.find((c) => c.id === classId);
+      if (cls) setClassData(cls);
+      setAllClasses(classes);
+      setStudents(students);
+      await refreshEvents();
+    })().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncVersion]);
 
   // בכל שינוי תאריך צפייה (או אחרי טעינת מערכת השעות) — לחשב אילו שיעורים
   // חלים על היום הזה, ולבחור ברירת מחדל: השיעור החי עכשיו (רק אם זה היום
