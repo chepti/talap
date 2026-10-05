@@ -8,6 +8,7 @@ import ClassroomView from './pages/ClassroomView';
 import RosterAdmin from './pages/RosterAdmin';
 import ScheduleAdmin from './pages/ScheduleAdmin';
 import ReportsView from './pages/ReportsView';
+import PlannerView from './pages/PlannerView';
 import Footer from './components/Footer';
 
 export default function App() {
@@ -86,6 +87,7 @@ export default function App() {
             onOpenRoster={() => navigate('roster')}
             onOpenSchedule={() => navigate('schedule')}
             onOpenReports={() => navigate('reports')}
+            onOpenPlanner={() => navigate('planner')}
             onLogout={logout}
           />
         )}
@@ -95,11 +97,13 @@ export default function App() {
             onBack={goBack}
             onSwitchClass={(id) => navigate('classroom', id)}
             onOpenReports={() => navigate('reports')}
+            onOpenPlanner={() => navigate('planner')}
           />
         )}
         {view === 'roster' && <RosterAdmin onBack={goBack} />}
         {view === 'schedule' && <ScheduleAdmin onBack={goBack} />}
         {view === 'reports' && <ReportsView onBack={goBack} />}
+        {view === 'planner' && <PlannerView onBack={goBack} />}
       </div>
       {view !== 'classroom' && <Footer onFeedback={feedback} />}
     </div>

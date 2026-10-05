@@ -79,7 +79,7 @@ function helpDoc() {
             'schedule_set'    => 'POST — {entries:[{dayOfWeek(0=ראשון..6=שבת), period, startTime(HH:MM), endTime(HH:MM), classId, subject, mashovSubjectLabel?}]} — מחליף את כל המערכת.',
             'current_lesson'  => 'GET — ?classId=N&at=ISO(אופציונלי, ברירת מחדל עכשיו) — איזה שיעור (period+subject) פעיל כרגע לפי מערכת השעות.',
             'lesson_get'      => 'GET — ?classId=&date=&period= — נושא השיעור שכבר הוזן לשיעור הזה, אם יש.',
-            'lesson_topic'    => 'POST — {classId, date(YYYY-MM-DD), period, topic}. שדה נושא השיעור, פעם אחת לשיעור.',
+            'lesson_topic'    => 'POST — {classId, date(YYYY-MM-DD), period, topic?, planUrl?, notes?}. נושא השיעור + קישור לתכנון/מצגת (http/https) + הערות הכנה לעצמי. עדכון חלקי: רק שדות שנשלחו משתנים. אפשר להזין מראש לשיעורים עתידיים (מסך תכנון שיעורים).',
             'events_create'   => 'POST — {classId, studentId|studentMatch, type, date, period, note?}. type אחד מ-' . implode('/', array_keys(EVENT_TYPES)) . '. date+period מזהים את השיעור (ראו current_lesson).',
             'events_set_note' => 'POST — {id, note}. הוספת/עדכון הערה מילולית לאירוע קיים.',
             'events_delete'   => 'POST — {id} (ביטול סימון בטעות).',
@@ -422,19 +422,26 @@ function dispatch($action, $data) {
         $classId = (int)($data['classId'] ?? 0);
         $date = $data['date'] ?? '';
         $period = (int)($data['period'] ?? 0);
-        $topic = $data['topic'] ?? '';
         if (!$classId || !$date || !$period) fail('classId, date, period required');
+        // עדכון חלקי: רק שדות שנשלחו משתנים (topic = נושא, planUrl = קישור לתכנון/מצגת, notes = הערות הכנה לעצמי)
+        $fields = [];
+        foreach (['topic', 'planUrl', 'notes'] as $f) {
+            if (array_key_exists($f, $data)) $fields[$f] = mb_substr(trim((string)$data[$f]), 0, $f === 'planUrl' ? 500 : 2000);
+        }
+        if (!empty($fields['planUrl']) && !preg_match('#^https?://#i', $fields['planUrl'])) fail('planUrl must start with http:// or https://');
         $result = null;
-        storeUpdate('lessons', [], function ($lessons) use ($classId, $date, $period, $topic, &$result) {
+        storeUpdate('lessons', [], function ($lessons) use ($classId, $date, $period, $fields, &$result) {
             foreach ($lessons as &$l) {
                 if ($l['classId'] === $classId && $l['date'] === $date && $l['period'] === $period) {
-                    $l['topic'] = $topic;
+                    foreach ($fields as $k => $v) $l[$k] = $v;
                     $l['updatedAt'] = date('Y-m-d H:i:s');
                     $result = $l;
                     return $lessons;
                 }
             }
-            $new = ['id' => nextId($lessons), 'classId' => $classId, 'date' => $date, 'period' => $period, 'topic' => $topic, 'updatedAt' => date('Y-m-d H:i:s')];
+            $new = ['id' => nextId($lessons), 'classId' => $classId, 'date' => $date, 'period' => $period,
+                    'topic' => '', 'planUrl' => '', 'notes' => '', 'updatedAt' => date('Y-m-d H:i:s')];
+            foreach ($fields as $k => $v) $new[$k] = $v;
             $lessons[] = $new;
             $result = $new;
             return $lessons;

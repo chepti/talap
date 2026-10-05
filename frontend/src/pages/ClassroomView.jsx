@@ -36,7 +36,9 @@ function toggleFullscreen() {
   }
 }
 
-export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports }) {
+export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports, onOpenPlanner }) {
+  const [planUrl, setPlanUrl] = useState('');
+  const [prepNotes, setPrepNotes] = useState('');
   const [classData, setClassData] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -65,6 +67,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   async function loadLessonPeriod(period, subject, forDate = viewDate) {
     setLesson({ period, subject, date: forDate });
     const lg = await api('lesson_get', { classId, date: forDate, period });
+    setPlanUrl(lg.lesson?.planUrl || '');
+    setPrepNotes(lg.lesson?.notes || '');
     let t = lg.lesson?.topic || '';
     // בשיעור תפילה הנושא קבוע — לא צריך להזין כל פעם מחדש
     if (!t && subject?.trim() === 'תפילה') {
@@ -388,6 +392,18 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           </div>
         )}
 
+        {lesson && /^https?:\/\//i.test(planUrl) && (
+          <a href={planUrl} target="_blank" rel="noopener noreferrer" className="pill-btn secondary" style={{ textDecoration: 'none', textAlign: 'center' }}>
+            פתיחת תכנון השיעור
+          </a>
+        )}
+        {lesson && prepNotes.trim() && (
+          <div className="card" style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
+            <div style={{ opacity: 0.6, fontSize: '0.75rem', marginBottom: 4 }}>הערות לעצמי:</div>
+            {prepNotes}
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
           <button
             className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
@@ -397,6 +413,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
             className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
             onClick={() => { setEditMode(editMode === 'layout' ? 'none' : 'layout'); setActiveBucket(null); }}
           >עריכת סידור שולחנות</button>
+          <button className="pill-btn ghost" onClick={onOpenPlanner}>תכנון שיעורים</button>
           <button className="pill-btn ghost" onClick={onOpenReports}>דוחות</button>
           {editMode === 'layout' && (
             <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
