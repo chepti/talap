@@ -305,8 +305,15 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     setEditMode('none');
   }
 
+  async function leaveWithTopic() {
+    if (!topic.trim()) return;
+    await saveTopic();
+    setConfirmLeave(false);
+    onBack();
+  }
+
   function tryBack() {
-    if (lesson && !topic.trim()) { setConfirmLeave(true); return; }
+    if (lesson && !topic.trim()) { setDrawerOpen(false); setConfirmLeave(true); return; }
     onBack();
   }
 
@@ -504,12 +511,18 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
       {confirmLeave && (
         <div className="card" style={{
           position: 'fixed', top: '40%', left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: '90vw',
-          display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 20,
+          display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.25)', zIndex: 35,
         }}>
-          <span>לא מילאת נושא שיעור — למלא עכשיו או לדלג?</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="pill-btn secondary" onClick={() => setConfirmLeave(false)}>למלא עכשיו</button>
-            <button className="pill-btn" onClick={() => { setConfirmLeave(false); onBack(); }}>לדלג</button>
+          <span style={{ fontWeight: 600 }}>לא מילאת נושא שיעור — מה היה הנושא?</span>
+          <input
+            type="text" placeholder="נושא השיעור" value={topic} style={{ minWidth: 280 }}
+            onChange={(e) => { setTopic(e.target.value); setTopicSaved(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') leaveWithTopic(); }}
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="pill-btn" disabled={!topic.trim()} onClick={leaveWithTopic}>שמירה ויציאה</button>
+            <button className="pill-btn ghost" onClick={() => { setConfirmLeave(false); onBack(); }}>יציאה בלי נושא</button>
+            <button className="pill-btn ghost" onClick={() => setConfirmLeave(false)}>להישאר בכיתה</button>
           </div>
         </div>
       )}
