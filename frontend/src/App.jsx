@@ -39,6 +39,12 @@ export default function App() {
     window.history.back();
   }
 
+  // חזרה למסך הראשי ישירות (בלי תלות במה שיש בהיסטוריה — למשל אחרי פתיחה אוטומטית לכיתה או מעבר בין כיתות)
+  function goHome() {
+    setView('picker');
+    window.history.pushState({ view: 'picker' }, '');
+  }
+
   // בכניסה לאפליקציה: אם יש כרגע שיעור פעיל לפי מערכת השעות (בכל כיתה) —
   // לפתוח ישר לתוכה במקום להציג את מסך בחירת הכיתה
   useEffect(() => {
@@ -54,7 +60,9 @@ export default function App() {
         if (match) {
           setClassId(match.classId);
           setView('classroom');
-          window.history.replaceState({ view: 'classroom', classId: match.classId }, '');
+          // מסך הבית נשאר מתחת בהיסטוריה, כדי שגם כפתור "חזרה" של המכשיר יוביל אליו
+          window.history.replaceState({ view: 'picker' }, '');
+          window.history.pushState({ view: 'classroom', classId: match.classId }, '');
         }
       } catch { /* אם זה נכשל, פשוט נשארים במסך בחירת כיתה */ }
       setCheckingAutoOpen(false);
@@ -94,7 +102,7 @@ export default function App() {
         {view === 'classroom' && (
           <ClassroomView
             classId={classId}
-            onBack={goBack}
+            onBack={goHome}
             onSwitchClass={(id) => navigate('classroom', id)}
             onOpenReports={() => navigate('reports')}
             onOpenPlanner={() => navigate('planner')}
