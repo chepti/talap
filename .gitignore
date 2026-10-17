@@ -9,3 +9,5 @@ backend/photos/*.jpg
 # build/deps
 frontend/node_modules/
 frontend/dist/
+
+סיסמה-חדשה.txt

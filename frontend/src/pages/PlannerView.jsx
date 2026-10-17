@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { useSyncVersion, sync } from '../lib/offline';
 import { todayStr } from '../lib/date';
 import { formatHebrewDate } from '../lib/hebrewDate';
 
@@ -37,8 +38,22 @@ function PlanCard({ entry, className, date, lesson }) {
   const [planUrl, setPlanUrl] = useState(lesson?.planUrl || '');
   const [notes, setNotes] = useState(lesson?.notes || '');
   const [saved, setSaved] = useState(false);
+  // הערך האחרון ששמרנו/קיבלנו מהשרת — שומרים רק כשהמשתמשת באמת שינתה (בלי דריסה בעת יציאה משדה שלא נערך)
+  const base = useRef({ topic: lesson?.topic || '', planUrl: lesson?.planUrl || '', notes: lesson?.notes || '' });
+
+  // עדכון מהשרת (סנכרון) — רק לשדות שלא נערכו כרגע ידנית
+  useEffect(() => {
+    const next = { topic: lesson?.topic || '', planUrl: lesson?.planUrl || '', notes: lesson?.notes || '' };
+    if (base.current.topic !== next.topic && topic === base.current.topic) setTopic(next.topic);
+    if (base.current.planUrl !== next.planUrl && planUrl === base.current.planUrl) setPlanUrl(next.planUrl);
+    if (base.current.notes !== next.notes && notes === base.current.notes) setNotes(next.notes);
+    base.current = next;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson?.topic, lesson?.planUrl, lesson?.notes]);
 
   async function save(field, value) {
+    if (value === base.current[field]) return;
+    base.current = { ...base.current, [field]: value };
     await api('lesson_topic', { classId: entry.classId, date, period: entry.period, [field]: value });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -93,12 +108,19 @@ export default function PlannerView({ onBack }) {
       .catch((e) => setError(e.message));
   }, []);
 
+  const syncVersion = useSyncVersion();
+  useEffect(() => { sync(); }, []); // משיכה עדכנית מהשרת בכניסה למסך (למשל אחרי עריכה ממכשיר אחר)
+  const loadedWeek = useRef(null);
   useEffect(() => {
-    setLessons(null);
+    // מעבר שבוע: מנקים; רענון מסנכרון: מחליפים בשקט (בלי להעלים את הכרטיסים)
+    if (loadedWeek.current !== weekStart) setLessons(null);
+    loadedWeek.current = weekStart;
+    let alive = true;
     api('lessons_range', { from: weekStart, to: addDays(weekStart, 6) })
-      .then((r) => setLessons(r.lessons))
+      .then((r) => { if (alive) setLessons(r.lessons); })
       .catch((e) => setError(e.message));
-  }, [weekStart]);
+    return () => { alive = false; };
+  }, [weekStart, syncVersion]);
 
   const classNames = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c.name])), [classes]);
 
