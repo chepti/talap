@@ -106,6 +106,8 @@ export default function App() {
             onSwitchClass={(id) => navigate('classroom', id)}
             onOpenReports={() => navigate('reports')}
             onOpenPlanner={() => navigate('planner')}
+            onOpenRoster={() => navigate('roster')}
+            onOpenSchedule={() => navigate('schedule')}
           />
         )}
         {view === 'roster' && <RosterAdmin onBack={goBack} />}

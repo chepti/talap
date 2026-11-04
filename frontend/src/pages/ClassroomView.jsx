@@ -1,32 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { useSyncVersion } from '../lib/offline';
 import { todayStr } from '../lib/date';
 import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
 import DatePicker from '../components/DatePicker';
+import PhotoCapture from '../components/PhotoCapture';
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
 const LABEL_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.label]));
 
-function MaximizeIcon() {
+/* ---------- אייקונים (סגנון Lucide: stroke 2, קצוות מעוגלים) ---------- */
+function Icon({ children, size = 18 }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-      <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-      <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
     </svg>
   );
 }
-
-function MenuIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-  );
-}
+const MenuIcon = ({ size }) => <Icon size={size}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>;
+const MaximizeIcon = () => <Icon><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></Icon>;
+const CameraIcon = () => <Icon><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" /><circle cx="12" cy="13" r="3.5" /></Icon>;
+const PlanIcon = () => <Icon><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01" /></Icon>;
+const UsersIcon = () => <Icon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
+const ChevronIcon = () => <Icon size={14}><path d="m6 9 6 6 6-6" /></Icon>;
+const CloseIcon = () => <Icon size={16}><path d="M18 6 6 18M6 6l12 12" /></Icon>;
+const TrashIcon = () => <Icon size={16}><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" /></Icon>;
+const ExternalIcon = () => <Icon size={16}><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></Icon>;
 
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
@@ -36,7 +36,30 @@ function toggleFullscreen() {
   }
 }
 
-export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports, onOpenPlanner }) {
+const normalizeUrl = (v) => {
+  const t = (v || '').trim();
+  if (!t) return '';
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+};
+
+function ToolBtn({ icon, label, active, onClick }) {
+  return (
+    <button
+      className={`pill-btn ${active ? '' : 'ghost'}`}
+      onClick={onClick}
+      title={label}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: active ? undefined : 'rgba(255,255,255,0.85)' }}
+    >
+      {icon}<span style={{ fontSize: '0.9rem' }}>{label}</span>
+    </button>
+  );
+}
+
+function SectionTitle({ children }) {
+  return <div style={{ opacity: 0.55, fontSize: '0.75rem', fontWeight: 700, letterSpacing: 0.5, marginTop: 2 }}>{children}</div>;
+}
+
+export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports, onOpenPlanner, onOpenRoster, onOpenSchedule }) {
   const [planUrl, setPlanUrl] = useState('');
   const [prepNotes, setPrepNotes] = useState('');
   const [classData, setClassData] = useState(null);
@@ -44,7 +67,6 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   const [students, setStudents] = useState([]);
   const [lesson, setLesson] = useState(undefined); // undefined = loading, null = no lesson now
   const [topic, setTopic] = useState('');
-  const [topicSaved, setTopicSaved] = useState(true);
   const [events, setEvents] = useState([]);
   const [activeBucket, setActiveBucket] = useState(null);
   const [editMode, setEditMode] = useState('none'); // none | seating | layout
@@ -63,20 +85,28 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   const [viewDate, setViewDate] = useState(todayStr());
   const [error, setError] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [popover, setPopover] = useState(null); // 'class' | 'lesson' | null
+  const [sheet, setSheet] = useState(null); // 'plan' | 'students' | null
+  const [photoMode, setPhotoMode] = useState(false);
+  const [photoStudent, setPhotoStudent] = useState(null); // { id, name }
+  const [newStudentName, setNewStudentName] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const lastSaved = useRef({ topic: '', planUrl: '', notes: '' });
+  const noteFocused = useRef(false);
 
   async function loadLessonPeriod(period, subject, forDate = viewDate) {
     setLesson({ period, subject, date: forDate });
     const lg = await api('lesson_get', { classId, date: forDate, period });
-    setPlanUrl(lg.lesson?.planUrl || '');
-    setPrepNotes(lg.lesson?.notes || '');
     let t = lg.lesson?.topic || '';
     // בשיעור תפילה הנושא קבוע — לא צריך להזין כל פעם מחדש
     if (!t && subject?.trim() === 'תפילה') {
       t = 'תפילה';
       await api('lesson_topic', { classId, date: forDate, period, topic: t });
     }
+    lastSaved.current = { topic: t, planUrl: lg.lesson?.planUrl || '', notes: lg.lesson?.notes || '' };
+    setPlanUrl(lastSaved.current.planUrl);
+    setPrepNotes(lastSaved.current.notes);
     setTopic(t);
-    setTopicSaved(true);
     const evt = await api('events_today', { date: forDate });
     const group = evt.lessons.find((g) => g.classId === classId && g.period === period);
     setEvents(group ? group.events : []);
@@ -100,6 +130,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   useEffect(() => {
     setError('');
     setLesson(undefined);
+    setSheet(null);
+    setPhotoMode(false);
     loadAll().catch((e) => setError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
@@ -153,6 +185,14 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleAll, viewDate, classId]);
 
+  // פס ההערה: נעלם לבד אחרי כמה שניות אם לא התחילו לכתוב בו
+  useEffect(() => {
+    if (!noteEvent) return undefined;
+    noteFocused.current = false;
+    const t = setTimeout(() => { if (!noteFocused.current) setNoteEvent(null); }, 6000);
+    return () => clearTimeout(t);
+  }, [noteEvent]);
+
   const studentsById = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
   const seatedStudentIds = useMemo(() => {
@@ -205,12 +245,24 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     setEvents(group ? group.events : []);
   }
 
+  async function reloadStudents() {
+    const [{ students }, { classes }] = await Promise.all([api('students_list', { classId }), api('classes_list')]);
+    setStudents(students);
+    const cls = classes.find((c) => c.id === classId);
+    if (cls) setClassData(cls);
+  }
+
   async function persistDesks(newDesks) {
     setClassData({ ...classData, desks: newDesks });
     await api('seating_update', { classId, desks: newDesks });
   }
 
   async function handleSeatClick(deskId, seatIndex, studentId) {
+    if (photoMode) {
+      if (studentId) setPhotoStudent({ id: studentId, name: studentsById[studentId]?.fullName || '' });
+      return;
+    }
+
     if (selectedPoolStudent != null) {
       // שיבוץ תלמיד/ה מהמחסן למקום הזה (מי שהיה שם, אם היה, פשוט חוזר להיות לא-משובץ)
       const newDesks = classData.desks.map((d) => ({ ...d, seats: [...d.seats] }));
@@ -276,15 +328,19 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     await persistDesks(newDesks);
   }
 
-  async function saveTopic() {
+  // שמירת שדה של השיעור (נושא / קישור לתכנון / הערות לעצמי) — רק אם באמת השתנה, כדי לא לדרוס בטעות
+  async function saveLessonField(field, rawValue) {
     if (!lesson) return;
-    await api('lesson_topic', { classId, date: lesson.date || viewDate, period: lesson.period, topic });
-    setTopicSaved(true);
+    const value = field === 'planUrl' ? normalizeUrl(rawValue) : rawValue;
+    if (field === 'planUrl') setPlanUrl(value);
+    if (value === lastSaved.current[field]) return;
+    lastSaved.current = { ...lastSaved.current, [field]: value };
+    await api('lesson_topic', { classId, date: lesson.date || viewDate, period: lesson.period, [field]: value });
   }
 
   async function saveNote() {
     if (!noteEvent) return;
-    await api('events_set_note', { id: noteEvent.id, note: noteText });
+    if (noteText.trim()) await api('events_set_note', { id: noteEvent.id, note: noteText });
     setNoteEvent(null);
     refreshEvents();
   }
@@ -305,9 +361,42 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     setEditMode('none');
   }
 
+  async function savePhoto(dataUrl) {
+    if (!photoStudent) return;
+    await api('photo_upload', { studentId: photoStudent.id, imageBase64: dataUrl });
+    setPhotoStudent(null); // נשארים במצב צילום — אפשר לצלם את התלמיד/ה הבא/ה מיד
+    await reloadStudents();
+  }
+
+  async function addStudent(e) {
+    e.preventDefault();
+    const fullName = newStudentName.trim();
+    if (!fullName) return;
+    const { student } = await api('students_upsert', { classId, fullName });
+    setNewStudentName('');
+    // משבצים אוטומטית במקום הפנוי הראשון (אם יש), כדי שיופיע מיד בכיתה
+    const desks = classData.desks.map((d) => ({ ...d, seats: [...d.seats] }));
+    const free = desks.find((d) => d.seats.some((s) => s === null));
+    if (student && free) {
+      free.seats[free.seats.findIndex((s) => s === null)] = student.id;
+      await persistDesks(desks);
+    }
+    await reloadStudents();
+  }
+
+  async function removeStudent(id) {
+    await api('students_delete', { id });
+    setConfirmDeleteId(null);
+    if (seatedStudentIds.has(id)) {
+      const desks = classData.desks.map((d) => ({ ...d, seats: d.seats.map((s) => (s === id ? null : s)) }));
+      await persistDesks(desks);
+    }
+    await reloadStudents();
+  }
+
   async function leaveWithTopic() {
     if (!topic.trim()) return;
-    await saveTopic();
+    await saveLessonField('topic', topic);
     setConfirmLeave(false);
     onBack();
   }
@@ -317,124 +406,162 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     onBack();
   }
 
+  function closeOverlays() { setDrawerOpen(false); setPopover(null); }
+
+  function togglePhotoMode() {
+    setPhotoMode((m) => !m);
+    setActiveBucket(null);
+    setEditMode('none');
+    setSelectedSeat(null);
+    setSelectedPoolStudent(null);
+  }
+
   if (!classData || lesson === undefined) return <div style={{ padding: 24 }}>טוענת…</div>;
+
+  const isPrayer = lesson?.subject?.trim() === 'תפילה';
+  const otherClasses = allClasses.filter((c) => c.id !== classId);
+
+  const chipStyle = {
+    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999,
+    border: '1px solid var(--color-border)', background: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer',
+  };
+  const popoverStyle = {
+    position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 6, zIndex: 40, minWidth: 180,
+    display: 'flex', flexDirection: 'column', gap: 6, boxShadow: '0 6px 24px rgba(0,0,0,0.22)',
+  };
 
   return (
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
-      {/* פינת בקרה קבועה — יושבים בתוך פינות הקנבס עצמו, לא דוחקים אותו למטה */}
-      <div style={{ position: 'absolute', top: 24, insetInlineEnd: 24, zIndex: 30 }}>
-        <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא" style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.85)' }}>
-          <MaximizeIcon />
-        </button>
-      </div>
-      <div style={{ position: 'absolute', top: 24, insetInlineStart: 24, zIndex: 30 }}>
-        <button className="pill-btn ghost" onClick={() => setDrawerOpen((o) => !o)} title="תפריט" style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.85)' }}>
-          <MenuIcon size={22} />
-        </button>
-      </div>
-
-      {drawerOpen && (
-        <div onClick={() => setDrawerOpen(false)} style={{ position: 'absolute', inset: 0, zIndex: 27, background: 'rgba(0,0,0,0.15)' }} />
+      {(drawerOpen || popover) && (
+        <div onClick={closeOverlays} style={{ position: 'absolute', inset: 0, zIndex: 27, background: drawerOpen ? 'rgba(0,0,0,0.15)' : 'transparent' }} />
       )}
 
-      {/* תפריט נשלף — כיתה, תאריך, שיעור, נושא, עריכת סידורים */}
+      {/* תפריט נשלף — מסודר לפי נושאים */}
       <div style={{
         position: 'absolute', top: 0, insetInlineStart: 0, height: '100%', width: 290, zIndex: 28,
         background: 'var(--color-bg)', boxShadow: drawerOpen ? '6px 0 24px rgba(0,0,0,0.2)' : 'none',
         transform: `translateX(${drawerOpen ? '0' : '100%'})`, transition: 'transform 0.25s ease',
-        padding: '64px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14,
+        padding: '16px 18px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12,
       }}>
-        <button className="pill-btn ghost" onClick={tryBack} style={{ alignSelf: 'flex-start' }}>← למסך הראשי</button>
-        <h1 style={{ margin: 0, fontSize: '1.3rem' }}>{classData.name}</h1>
-        <span style={{ opacity: 0.7, fontSize: '0.9rem' }}>
-          {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : (dayLessons.length ? 'בחרי שיעור' : 'אין שיעור מוגדר ליום הזה בכיתה זו')}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 style={{ margin: 0, fontSize: '1.3rem', flex: 1 }}>{classData.name}</h1>
+          <button className="pill-btn ghost" onClick={() => setDrawerOpen(false)} title="סגירה" style={{ padding: '6px 10px' }}><CloseIcon /></button>
+        </div>
 
+        <SectionTitle>מעבר</SectionTitle>
         <DatePicker value={viewDate} onChange={setViewDate} />
-
-        {allClasses.length > 1 && (
-          <>
-            <hr style={{ width: '100%', border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>מעבר לכיתה אחרת:</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {allClasses.filter((c) => c.id !== classId).map((c) => (
-                  <button key={c.id} className="pill-btn secondary" style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-                    onClick={() => { setDrawerOpen(false); onSwitchClass(c.id); }}
-                  >{c.name}</button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {dayLessons.length > 1 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ opacity: 0.6, fontSize: '0.8rem' }}>שיעורי היום הזה — להזנה גם שלא בזמן אמת:</span>
-            {dayLessons.map((e) => (
-              <button
-                key={e.period}
-                className={`pill-btn ${lesson?.period === e.period ? '' : 'secondary'}`}
-                style={{ padding: '6px 16px', fontSize: '0.85rem' }}
-                onClick={() => loadLessonPeriod(e.period, e.subject, viewDate)}
-              >שיעור {e.period} · {e.subject}</button>
+        {otherClasses.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {otherClasses.map((c) => (
+              <button key={c.id} className="pill-btn secondary" style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+                onClick={() => { setDrawerOpen(false); onSwitchClass(c.id); }}
+              >{c.name}</button>
             ))}
           </div>
         )}
+        <button className="pill-btn ghost" onClick={tryBack} style={{ alignSelf: 'flex-start' }}>← למסך הראשי</button>
 
-        {lesson && lesson.subject?.trim() === 'תפילה' && (
-          <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>נושא השיעור: תפילה (קבוע, לא צריך להזין)</div>
-        )}
-
-        {lesson && lesson.subject?.trim() !== 'תפילה' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="text" placeholder="נושא השיעור"
-              value={topic}
-              onChange={(e) => { setTopic(e.target.value); setTopicSaved(false); }}
-              onBlur={saveTopic}
-              style={{ flex: 1 }}
-            />
-            {!topicSaved && <button className="pill-btn secondary" onClick={saveTopic}>שמירה</button>}
+        <hr style={{ width: '100%', border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
+        <SectionTitle>הכיתה</SectionTitle>
+        <button
+          className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
+          onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setSelectedPoolStudent(null); setActiveBucket(null); setPhotoMode(false); setDrawerOpen(false); }}
+        >עריכת סידור ישיבה</button>
+        <button
+          className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
+          onClick={() => { setEditMode(editMode === 'layout' ? 'none' : 'layout'); setActiveBucket(null); setPhotoMode(false); }}
+        >עריכת סידור שולחנות</button>
+        {editMode === 'layout' && (
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label>שורות: <input type="text" inputMode="numeric" value={layoutRows} onChange={(e) => setLayoutRows(Number(e.target.value) || 1)} style={{ width: 50 }} /></label>
+            <label>עמודות: <input type="text" inputMode="numeric" value={layoutCols} onChange={(e) => setLayoutCols(Number(e.target.value) || 1)} style={{ width: 50 }} /></label>
+            <button className="pill-btn" onClick={applyLayout}>עדכון פריסה</button>
           </div>
         )}
 
-        {lesson && /^https?:\/\//i.test(planUrl) && (
-          <a href={planUrl} target="_blank" rel="noopener noreferrer" className="pill-btn secondary" style={{ textDecoration: 'none', textAlign: 'center' }}>
-            פתיחת תכנון השיעור
-          </a>
-        )}
-        {lesson && prepNotes.trim() && (
-          <div className="card" style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
-            <div style={{ opacity: 0.6, fontSize: '0.75rem', marginBottom: 4 }}>הערות לעצמי:</div>
-            {prepNotes}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'auto' }}>
-          <button
-            className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
-            onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setSelectedPoolStudent(null); setActiveBucket(null); }}
-          >עריכת סידור ישיבה</button>
-          <button
-            className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
-            onClick={() => { setEditMode(editMode === 'layout' ? 'none' : 'layout'); setActiveBucket(null); }}
-          >עריכת סידור שולחנות</button>
-          <button className="pill-btn ghost" onClick={onOpenPlanner}>תכנון שיעורים</button>
-          <button className="pill-btn ghost" onClick={onOpenReports}>דוחות</button>
-          {editMode === 'layout' && (
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <label>שורות: <input type="text" inputMode="numeric" value={layoutRows} onChange={(e) => setLayoutRows(Number(e.target.value) || 1)} style={{ width: 50 }} /></label>
-              <label>עמודות: <input type="text" inputMode="numeric" value={layoutCols} onChange={(e) => setLayoutCols(Number(e.target.value) || 1)} style={{ width: 50 }} /></label>
-              <button className="pill-btn" onClick={applyLayout}>עדכון פריסה</button>
-            </div>
-          )}
-        </div>
+        <hr style={{ width: '100%', border: 'none', borderTop: '1px solid var(--color-border)', margin: 0 }} />
+        <SectionTitle>כלים</SectionTitle>
+        <button className="pill-btn ghost" onClick={onOpenPlanner}>תכנון שיעורים</button>
+        <button className="pill-btn ghost" onClick={onOpenReports}>דוחות</button>
+        <button className="pill-btn ghost" onClick={onOpenRoster}>ניהול תלמידים</button>
+        <button className="pill-btn ghost" onClick={onOpenSchedule}>מערכת שעות</button>
       </div>
 
-      {/* תוכן ראשי — הכיתה במרכז המסך */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '14px 20px', gap: 10 }}>
+      {/* תוכן ראשי */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '10px 20px 14px', gap: 10 }}>
+        {/* פס עליון קבוע: מה השיעור עכשיו, מה הנושא, וקיצורי דרך */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', position: 'relative', zIndex: 29 }}>
+          <button className="pill-btn ghost" onClick={() => { setPopover(null); setDrawerOpen((o) => !o); }} title="תפריט"
+            style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.85)' }}>
+            <MenuIcon size={20} />
+          </button>
+
+          <div style={{ position: 'relative' }}>
+            <button style={chipStyle} onClick={() => setPopover((p) => (p === 'class' ? null : 'class'))} title="מעבר לכיתה אחרת">
+              {classData.name}{otherClasses.length > 0 && <ChevronIcon />}
+            </button>
+            {popover === 'class' && otherClasses.length > 0 && (
+              <div className="card" style={popoverStyle}>
+                {otherClasses.map((c) => (
+                  <button key={c.id} className="pill-btn secondary" onClick={() => { setPopover(null); onSwitchClass(c.id); }}>{c.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <button style={{ ...chipStyle, background: lesson ? 'var(--color-primary-light)' : 'rgba(255,255,255,0.9)' }}
+              onClick={() => dayLessons.length > 1 && setPopover((p) => (p === 'lesson' ? null : 'lesson'))}
+              title={dayLessons.length > 1 ? 'החלפת שיעור' : undefined}>
+              {lesson ? `שיעור ${lesson.period} · ${lesson.subject}` : 'אין שיעור ביום הזה'}
+              {dayLessons.length > 1 && <ChevronIcon />}
+            </button>
+            {popover === 'lesson' && (
+              <div className="card" style={popoverStyle}>
+                {dayLessons.map((e) => (
+                  <button key={e.period} className={`pill-btn ${lesson?.period === e.period ? '' : 'secondary'}`}
+                    onClick={() => { setPopover(null); loadLessonPeriod(e.period, e.subject, viewDate); }}>
+                    שיעור {e.period} · {e.subject}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {viewDate !== todayStr() && (
+            <span style={{ ...chipStyle, cursor: 'default', background: '#fff3cd' }}>{viewDate.split('-').reverse().join('.')}</span>
+          )}
+
+          {lesson && (isPrayer ? (
+            <span style={{ opacity: 0.7, fontSize: '0.9rem' }}>נושא: תפילה</span>
+          ) : (
+            <input
+              type="text" placeholder="נושא השיעור…" value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onBlur={() => saveLessonField('topic', topic)}
+              style={{ flex: '1 1 160px', minWidth: 140, maxWidth: 360, background: 'rgba(255,255,255,0.9)' }}
+            />
+          ))}
+
+          <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <ToolBtn icon={<PlanIcon />} label="תכנון שיעור" active={sheet === 'plan'} onClick={() => setSheet(sheet === 'plan' ? null : 'plan')} />
+            <ToolBtn icon={<CameraIcon />} label="צילום" active={photoMode} onClick={togglePhotoMode} />
+            <ToolBtn icon={<UsersIcon />} label="תלמידים" active={sheet === 'students'} onClick={() => setSheet(sheet === 'students' ? null : 'students')} />
+            <button className="pill-btn ghost" onClick={toggleFullscreen} title="מסך מלא" style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.85)' }}>
+              <MaximizeIcon />
+            </button>
+          </div>
+        </div>
+
         {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
+
+        {photoMode && (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'var(--color-primary-light)' }}>
+            <CameraIcon />
+            <span style={{ fontWeight: 600 }}>מצב צילום — לחצי על תלמיד/ה כדי לצלם</span>
+            <button className="pill-btn ghost" style={{ marginInlineStart: 'auto' }} onClick={() => setPhotoMode(false)}>סיום</button>
+          </div>
+        )}
 
         {editMode === 'seating' && (
           <div className="card" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -451,6 +578,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
             {selectedSeat && (
               <button className="pill-btn ghost" onClick={returnSelectedSeatToPool}>החזרת התלמיד/ה שנבחר/ה למחסן</button>
             )}
+            <button className="pill-btn" style={{ marginInlineStart: 'auto' }} onClick={() => { setEditMode('none'); setSelectedSeat(null); setSelectedPoolStudent(null); }}>סיום עריכה</button>
           </div>
         )}
 
@@ -462,19 +590,86 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           selectedSeat={selectedSeat}
           selectedPool={selectedPoolStudent}
           onSeatClick={handleSeatClick}
-          toolbar={editMode === 'none' ? <EventBucketBar active={activeBucket} onSelect={setActiveBucket} /> : null}
+          toolbar={editMode === 'none' ? <EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} /> : null}
         />
       </div>
 
+      {/* לוחית צד: תכנון השיעור (בלי לצאת מהמסך) / ניהול תלמידים מהיר */}
+      {sheet && (
+        <div className="card" style={{
+          position: 'absolute', top: 66, insetInlineEnd: 20, width: 340, maxHeight: 'calc(100% - 90px)', overflowY: 'auto',
+          zIndex: 26, display: 'flex', flexDirection: 'column', gap: 10, boxShadow: '0 8px 28px rgba(0,0,0,0.25)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <b style={{ flex: 1 }}>{sheet === 'plan' ? 'תכנון השיעור' : `תלמידים — ${classData.name}`}</b>
+            <button className="pill-btn ghost" onClick={() => setSheet(null)} title="סגירה" style={{ padding: '4px 8px' }}><CloseIcon /></button>
+          </div>
+
+          {sheet === 'plan' && (!lesson ? (
+            <span style={{ opacity: 0.6 }}>אין שיעור מוגדר ליום הזה.</span>
+          ) : (
+            <>
+              <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>שיעור {lesson.period} · {lesson.subject}</span>
+              <input type="text" placeholder="נושא השיעור" value={topic}
+                onChange={(e) => setTopic(e.target.value)} onBlur={() => saveLessonField('topic', topic)} />
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input type="text" inputMode="url" dir="ltr" placeholder="קישור לתכנון / מצגת הרצף" value={planUrl}
+                  onChange={(e) => setPlanUrl(e.target.value)} onBlur={() => saveLessonField('planUrl', planUrl)}
+                  style={{ flex: 1, textAlign: 'start' }} />
+                {/^https?:\/\//i.test(planUrl) && (
+                  <a href={planUrl} target="_blank" rel="noopener noreferrer" className="pill-btn secondary"
+                    style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 12px' }}>
+                    <ExternalIcon />פתיחה
+                  </a>
+                )}
+              </div>
+              <textarea rows={5} placeholder="הערות לעצמי: מה להדפיס, להכין, להביא…" value={prepNotes}
+                onChange={(e) => setPrepNotes(e.target.value)} onBlur={() => saveLessonField('notes', prepNotes)} />
+            </>
+          ))}
+
+          {sheet === 'students' && (
+            <>
+              <form onSubmit={addStudent} style={{ display: 'flex', gap: 6 }}>
+                <input type="text" placeholder="שם תלמיד/ה חדש/ה" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} style={{ flex: 1 }} />
+                <button className="pill-btn" type="submit" disabled={!newStudentName.trim()}>הוספה</button>
+              </form>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {students.length === 0 && <span style={{ opacity: 0.6 }}>אין תלמידים בכיתה.</span>}
+                {students.map((s) => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <span style={{ flex: 1 }}>{s.fullName}{!seatedStudentIds.has(s.id) && <span style={{ opacity: 0.5, fontSize: '0.75rem' }}> · ללא מקום</span>}</span>
+                    {confirmDeleteId === s.id ? (
+                      <>
+                        <button className="pill-btn" style={{ background: 'var(--color-removal)', padding: '4px 12px' }} onClick={() => removeStudent(s.id)}>מחיקה</button>
+                        <button className="pill-btn ghost" style={{ padding: '4px 10px' }} onClick={() => setConfirmDeleteId(null)}>ביטול</button>
+                      </>
+                    ) : (
+                      <button className="pill-btn ghost" title="הסרת תלמיד/ה" style={{ padding: '4px 8px', color: 'var(--color-removal)' }} onClick={() => setConfirmDeleteId(s.id)}><TrashIcon /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* פס הערה: קטן, בפינה השמאלית התחתונה, נעלם לבד */}
       {noteEvent && (
         <div className="card" style={{
-          position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: '90vw',
-          display: 'flex', gap: 8, alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.2)', zIndex: 20,
+          position: 'fixed', bottom: 14, left: 14, width: 'max-content', maxWidth: '60vw', padding: '6px 10px',
+          display: 'flex', gap: 6, alignItems: 'center', boxShadow: '0 3px 14px rgba(0,0,0,0.2)', zIndex: 20, fontSize: '0.85rem',
         }}>
-          <span>{LABEL_BY_TYPE[noteEvent.type]} — {noteEvent.studentName}: להוסיף הערה?</span>
-          <input type="text" value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="הערה (אופציונלי)" />
-          <button className="pill-btn" onClick={saveNote}>שמירה</button>
-          <button className="pill-btn ghost" onClick={() => setNoteEvent(null)}>דילוג</button>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: COLOR_BY_TYPE[noteEvent.type], flex: 'none' }} />
+          <span style={{ whiteSpace: 'nowrap' }} title={LABEL_BY_TYPE[noteEvent.type]}>{noteEvent.studentName}</span>
+          <input type="text" value={noteText} placeholder="הערה"
+            onFocus={() => { noteFocused.current = true; }}
+            onChange={(e) => { noteFocused.current = true; setNoteText(e.target.value); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveNote(); }}
+            style={{ width: 130, padding: '4px 8px', fontSize: '0.85rem' }} />
+          {noteText.trim() && <button className="pill-btn" style={{ padding: '4px 12px', fontSize: '0.8rem' }} onClick={saveNote}>שמירה</button>}
+          <button className="pill-btn ghost" title="סגירה" style={{ padding: '4px 6px' }} onClick={() => setNoteEvent(null)}><CloseIcon /></button>
         </div>
       )}
 
@@ -516,7 +711,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           <span style={{ fontWeight: 600 }}>לא מילאת נושא שיעור — מה היה הנושא?</span>
           <input
             type="text" placeholder="נושא השיעור" value={topic} style={{ minWidth: 280 }}
-            onChange={(e) => { setTopic(e.target.value); setTopicSaved(false); }}
+            onChange={(e) => setTopic(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') leaveWithTopic(); }}
           />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -525,6 +720,10 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
             <button className="pill-btn ghost" onClick={() => setConfirmLeave(false)}>להישאר בכיתה</button>
           </div>
         </div>
+      )}
+
+      {photoStudent && (
+        <PhotoCapture onSave={savePhoto} onCancel={() => setPhotoStudent(null)} />
       )}
     </div>
   );
