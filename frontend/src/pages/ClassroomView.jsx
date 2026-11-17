@@ -6,6 +6,14 @@ import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
 import DatePicker from '../components/DatePicker';
 import PhotoCapture from '../components/PhotoCapture';
+import StudentList from '../components/StudentList';
+
+function readPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+function writePref(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* ignore */ }
+}
 
 const COLOR_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.color]));
 const LABEL_BY_TYPE = Object.fromEntries(EVENT_TYPES.map((t) => [t.key, t.label]));
@@ -22,6 +30,8 @@ const MenuIcon = ({ size }) => <Icon size={size}><path d="M4 6h16M4 12h16M4 18h1
 const MaximizeIcon = () => <Icon><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></Icon>;
 const CameraIcon = () => <Icon><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z" /><circle cx="12" cy="13" r="3.5" /></Icon>;
 const PlanIcon = () => <Icon><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01" /></Icon>;
+const ListIcon = () => <Icon><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></Icon>;
+const GridIcon = () => <Icon><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></Icon>;
 const UsersIcon = () => <Icon><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
 const ChevronIcon = () => <Icon size={14}><path d="m6 9 6 6 6-6" /></Icon>;
 const CloseIcon = () => <Icon size={16}><path d="M18 6 6 18M6 6l12 12" /></Icon>;
@@ -88,6 +98,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   const [popover, setPopover] = useState(null); // 'class' | 'lesson' | null
   const [sheet, setSheet] = useState(null); // 'plan' | 'students' | null
   const [photoMode, setPhotoMode] = useState(false);
+  const [viewMode, setViewMode] = useState(readPref('talap.viewMode', 'desks')); // desks | list
+  const [sortBy, setSortBy] = useState(readPref('talap.sortBy', 'last')); // last | first
   const [photoStudent, setPhotoStudent] = useState(null); // { id, name }
   const [newStudentName, setNewStudentName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -465,7 +477,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
         <SectionTitle>הכיתה</SectionTitle>
         <button
           className={`pill-btn ${editMode === 'seating' ? '' : 'secondary'}`}
-          onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setSelectedPoolStudent(null); setActiveBucket(null); setPhotoMode(false); setDrawerOpen(false); }}
+          onClick={() => { setEditMode(editMode === 'seating' ? 'none' : 'seating'); setSelectedSeat(null); setSelectedPoolStudent(null); setActiveBucket(null); setPhotoMode(false); setDrawerOpen(false); setViewMode('desks'); writePref('talap.viewMode', 'desks'); }}
         >עריכת סידור ישיבה</button>
         <button
           className={`pill-btn ${editMode === 'layout' ? '' : 'secondary'}`}
@@ -544,6 +556,15 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           ))}
 
           <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <ToolBtn
+              icon={viewMode === 'list' ? <GridIcon /> : <ListIcon />}
+              label={viewMode === 'list' ? 'סידור ישיבה' : 'רשימת שמות'}
+              onClick={() => {
+                const next = viewMode === 'list' ? 'desks' : 'list';
+                setViewMode(next); writePref('talap.viewMode', next);
+                setEditMode('none'); setSelectedSeat(null); setSelectedPoolStudent(null);
+              }}
+            />
             <ToolBtn icon={<PlanIcon />} label="תכנון שיעור" active={sheet === 'plan'} onClick={() => setSheet(sheet === 'plan' ? null : 'plan')} />
             <ToolBtn icon={<CameraIcon />} label="צילום" active={photoMode} onClick={togglePhotoMode} />
             <ToolBtn icon={<UsersIcon />} label="תלמידים" active={sheet === 'students'} onClick={() => setSheet(sheet === 'students' ? null : 'students')} />
@@ -582,16 +603,27 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           </div>
         )}
 
-        <DeskGrid
-          classData={classData}
-          studentsById={studentsById}
-          dotsByStudent={dotsByStudent}
-          editMode={editMode === 'seating'}
-          selectedSeat={selectedSeat}
-          selectedPool={selectedPoolStudent}
-          onSeatClick={handleSeatClick}
-          toolbar={editMode === 'none' ? <EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} /> : null}
-        />
+        {viewMode === 'list' ? (
+          <StudentList
+            students={students}
+            dotsByStudent={dotsByStudent}
+            sortBy={sortBy}
+            onSortChange={(k) => { setSortBy(k); writePref('talap.sortBy', k); }}
+            onPick={(id) => handleSeatClick(null, 0, id)}
+            toolbar={<EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} />}
+          />
+        ) : (
+          <DeskGrid
+            classData={classData}
+            studentsById={studentsById}
+            dotsByStudent={dotsByStudent}
+            editMode={editMode === 'seating'}
+            selectedSeat={selectedSeat}
+            selectedPool={selectedPoolStudent}
+            onSeatClick={handleSeatClick}
+            toolbar={editMode === 'none' ? <EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} /> : null}
+          />
+        )}
       </div>
 
       {/* לוחית צד: תכנון השיעור (בלי לצאת מהמסך) / ניהול תלמידים מהיר */}
