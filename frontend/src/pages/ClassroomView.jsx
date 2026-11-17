@@ -100,6 +100,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   const [photoMode, setPhotoMode] = useState(false);
   const [viewMode, setViewMode] = useState(readPref('talap.viewMode', 'desks')); // desks | list
   const [sortBy, setSortBy] = useState(readPref('talap.sortBy', 'last')); // last | first
+  const [nameOrder, setNameOrder] = useState('fl'); // סדר השמות כפי ששמורים בכיתה הזו (לכל כיתה בנפרד)
+  useEffect(() => { setNameOrder(readPref(`talap.nameOrder.${classId}`, 'fl')); }, [classId]);
   const [photoStudent, setPhotoStudent] = useState(null); // { id, name }
   const [newStudentName, setNewStudentName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -609,6 +611,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
             dotsByStudent={dotsByStudent}
             sortBy={sortBy}
             onSortChange={(k) => { setSortBy(k); writePref('talap.sortBy', k); }}
+            nameOrder={nameOrder}
+            onNameOrderChange={(o) => { setNameOrder(o); writePref(`talap.nameOrder.${classId}`, o); }}
             onPick={(id) => handleSeatClick(null, 0, id)}
             toolbar={<EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} />}
           />
