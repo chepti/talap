@@ -6,7 +6,7 @@ import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
 import DatePicker from '../components/DatePicker';
 import PhotoCapture from '../components/PhotoCapture';
-import StudentList from '../components/StudentList';
+import StudentList, { NameControls, splitName } from '../components/StudentList';
 
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -218,6 +218,12 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     () => students.filter((s) => !seatedStudentIds.has(s.id)),
     [students, seatedStudentIds]
   );
+
+  // שמות להצגה בכרטיסי הישיבה: משפחה קודם או פרטי קודם, לפי הבחירה
+  const displayById = useMemo(() => Object.fromEntries(students.map((s) => {
+    const { first, last } = splitName(s.fullName, nameOrder);
+    return [s.id, { ...s, fullName: (sortBy === 'first' ? `${first} ${last}` : `${last} ${first}`).trim() }];
+  })), [students, sortBy, nameOrder]);
 
   const dotsByStudent = useMemo(() => {
     const map = {};
@@ -619,13 +625,19 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
         ) : (
           <DeskGrid
             classData={classData}
-            studentsById={studentsById}
+            studentsById={displayById}
             dotsByStudent={dotsByStudent}
             editMode={editMode === 'seating'}
             selectedSeat={selectedSeat}
             selectedPool={selectedPoolStudent}
             onSeatClick={handleSeatClick}
             toolbar={editMode === 'none' ? <EventBucketBar active={activeBucket} onSelect={(k) => { setPhotoMode(false); setActiveBucket(k); }} /> : null}
+            extra={editMode === 'none' ? (
+              <NameControls
+                sortBy={sortBy} onSortChange={(k) => { setSortBy(k); writePref('talap.sortBy', k); }}
+                nameOrder={nameOrder} onNameOrderChange={(o) => { setNameOrder(o); writePref(`talap.nameOrder.${classId}`, o); }}
+              />
+            ) : null}
           />
         )}
       </div>

@@ -24,6 +24,24 @@ function initials(name) {
   return (name || '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]).join('');
 }
 
+export function NameControls({ sortBy, onSortChange, nameOrder, onNameOrderChange }) {
+  return (
+    <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: 4 }}>
+        {[['last', 'משפחה קודם'], ['first', 'פרטי קודם']].map(([k, label]) => (
+          <button key={k} className={`pill-btn ${sortBy === k ? '' : 'ghost'}`} style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+            onClick={() => onSortChange(k)}>{label}</button>
+        ))}
+      </div>
+      <button className="pill-btn ghost" style={{ padding: '6px 14px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.55)' }}
+        title="בכיתה הזו השמות שמורים בסדר: לחצי כדי להחליף"
+        onClick={() => onNameOrderChange(nameOrder === 'fl' ? 'lf' : 'fl')}>
+        {nameOrder === 'fl' ? 'שמורים: פרטי משפחה' : 'שמורים: משפחה פרטי'}
+      </button>
+    </div>
+  );
+}
+
 export default function StudentList({ students, dotsByStudent, sortBy, onSortChange, nameOrder, onNameOrderChange, onPick, toolbar }) {
   const sorted = sortStudents(students, sortBy, nameOrder);
   return (
@@ -36,19 +54,7 @@ export default function StudentList({ students, dotsByStudent, sortBy, onSortCha
         {toolbar && (
           <div style={{ background: 'rgba(255,255,255,0.35)', borderRadius: 14, padding: '4px 6px' }}>{toolbar}</div>
         )}
-        <div style={{ marginInlineStart: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.55)', borderRadius: 999, padding: 4 }}>
-            {[['last', 'לפי שם משפחה'], ['first', 'לפי שם פרטי']].map(([k, label]) => (
-              <button key={k} className={`pill-btn ${sortBy === k ? '' : 'ghost'}`} style={{ padding: '6px 14px', fontSize: '0.85rem' }}
-                onClick={() => onSortChange(k)}>{label}</button>
-            ))}
-          </div>
-          <button className="pill-btn ghost" style={{ padding: '6px 14px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.55)' }}
-            title="בכיתה הזו השמות שמורים בסדר: לחצי כדי להחליף (משפיע על מיון והצגה)"
-            onClick={() => onNameOrderChange(nameOrder === 'fl' ? 'lf' : 'fl')}>
-            {nameOrder === 'fl' ? 'שמות שמורים: פרטי משפחה' : 'שמות שמורים: משפחה פרטי'}
-          </button>
-        </div>
+        <NameControls sortBy={sortBy} onSortChange={onSortChange} nameOrder={nameOrder} onNameOrderChange={onNameOrderChange} />
       </div>
 
       {/* טורים: מלמעלה למטה לאורך כל גובה הלוח, ואז טור חדש */}
