@@ -1,0 +1,60 @@
+name: Deploy to chepti.com/talap
+
+# כל דחיפה ל-main (מהמחשב, מהסלולרי, מכל מקום) בונה ומפרסמת אוטומטית לשרת. אפשר גם ידנית: Actions -> Deploy -> Run workflow.
+#
+# איך זה עובד: Hostinger חוסם SSH מכתובות של GitHub Actions, לכן ה-workflow בונה את האפליקציה (Vite) בעצמו,
+# אורז zip (frontend/dist + backend) ושולח אותו ב-HTTPS ל-deploy.php באתר (ראו הסבר בראש הקובץ).
+# הסוד DEPLOY_TOKEN (Settings -> Secrets and variables -> Actions) חייב להתאים ל-$DEPLOY_TOKEN ב-backend/api/config.php בשרת.
+# config.php, קבצי הנתונים (backend/data/*.json) והתמונות (backend/photos/*.jpg) לעולם לא נוגעים בהם.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # הגנה: רק הריפו המקורי יפרוס לשרת
+    if: github.repository == 'chepti/talap'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Pack bundle
+        run: |
+          (cd frontend/dist && zip -qr ../../deploy-bundle.zip .)
+          zip -qr deploy-bundle.zip backend -x 'backend/data/*' 'backend/photos/*' 'backend/api/config.php'
+          unzip -l deploy-bundle.zip | tail -1
+
+      - name: Call deploy endpoint
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          set -u
+          for i in 1 2 3; do
+            code=$(curl -sS -o resp.json -w '%{http_code}' --max-time 150 -X POST \
+              -H "X-Deploy-Token: ${DEPLOY_TOKEN}" \
+              -F "sha=${GITHUB_SHA}" \
+              -F "bundle=@deploy-bundle.zip" \
+              https://www.chepti.com/talap/deploy.php) || code=000
+            cat resp.json || true; echo
+            if [ "$code" = "200" ]; then exit 0; fi
+            echo "attempt $i failed (HTTP $code)"; sleep 10
+          done
+          echo "::error::deploy failed (last HTTP $code)"
+          exit 1
