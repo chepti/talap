@@ -105,7 +105,7 @@ function applyOp(action, b) {
     case 'lesson_topic': {
       // עדכון חלקי — רק שדות שנשלחו (topic / planUrl / notes)
       const fields = {};
-      for (const f of ['topic', 'planUrl', 'notes']) if (f in b) fields[f] = b[f];
+      for (const f of ['topic', 'planUrl', 'notes', 'prints']) if (f in b) fields[f] = b[f];
       const idx = state.lessons.findIndex((l) => l.classId === b.classId && l.date === b.date && l.period === b.period);
       const updatedAt = nowTs();
       if (idx >= 0) {
@@ -113,7 +113,7 @@ function applyOp(action, b) {
         lessons[idx] = { ...lessons[idx], ...fields, updatedAt };
         state = { ...state, lessons };
       } else {
-        state = { ...state, lessons: [...state.lessons, { id: -Date.now(), classId: b.classId, date: b.date, period: b.period, topic: '', planUrl: '', notes: '', ...fields, updatedAt }] };
+        state = { ...state, lessons: [...state.lessons, { id: -Date.now(), classId: b.classId, date: b.date, period: b.period, topic: '', planUrl: '', notes: '', prints: [], ...fields, updatedAt }] };
       }
       return;
     }
@@ -346,6 +346,7 @@ const LOCAL = {
   async lesson_topic(b) {
     const body = { classId: Number(b.classId), date: b.date, period: Number(b.period) };
     for (const f of ['topic', 'planUrl', 'notes']) if (f in b) body[f] = b[f] ?? '';
+    if ('prints' in b) body.prints = Array.isArray(b.prints) ? b.prints : [];
     enqueue('lesson_topic', body);
     return { lesson: state.lessons.find((l) => l.classId === body.classId && l.date === body.date && l.period === body.period) };
   },

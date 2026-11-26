@@ -6,7 +6,9 @@ import DeskGrid from '../components/DeskGrid';
 import EventBucketBar, { EVENT_TYPES, EDIT_KEY } from '../components/EventBucketBar';
 import DatePicker from '../components/DatePicker';
 import PhotoCapture from '../components/PhotoCapture';
-import StudentList, { NameControls, splitName } from '../components/StudentList';
+import PrintListEditor from '../components/PrintListEditor';
+import GroupPhotoTagger from '../components/GroupPhotoTagger';
+import StudentList, { NameControls, splitName, sortStudents } from '../components/StudentList';
 
 function readPref(key, fallback) {
   try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
@@ -72,6 +74,7 @@ function SectionTitle({ children }) {
 export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenReports, onOpenPlanner, onOpenRoster, onOpenSchedule }) {
   const [planUrl, setPlanUrl] = useState('');
   const [prepNotes, setPrepNotes] = useState('');
+  const [prints, setPrints] = useState([]);
   const [classData, setClassData] = useState(null);
   const [allClasses, setAllClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -102,6 +105,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
   const [sortBy, setSortBy] = useState(readPref('talap.sortBy', 'last')); // last | first
   const [nameOrder, setNameOrder] = useState('fl'); // סדר השמות כפי ששמורים בכיתה הזו (לכל כיתה בנפרד)
   useEffect(() => { setNameOrder(readPref(`talap.nameOrder.${classId}`, 'fl')); }, [classId]);
+  const [groupPhoto, setGroupPhoto] = useState(false);
   const [photoStudent, setPhotoStudent] = useState(null); // { id, name }
   const [newStudentName, setNewStudentName] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -120,6 +124,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     lastSaved.current = { topic: t, planUrl: lg.lesson?.planUrl || '', notes: lg.lesson?.notes || '' };
     setPlanUrl(lastSaved.current.planUrl);
     setPrepNotes(lastSaved.current.notes);
+    setPrints(lg.lesson?.prints || []);
     setTopic(t);
     const evt = await api('events_today', { date: forDate });
     const group = evt.lessons.find((g) => g.classId === classId && g.period === period);
@@ -358,6 +363,12 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
     await api('lesson_topic', { classId, date: lesson.date || viewDate, period: lesson.period, [field]: value });
   }
 
+  async function savePrints(arr) {
+    if (!lesson) return;
+    setPrints(arr);
+    await api('lesson_topic', { classId, date: lesson.date || viewDate, period: lesson.period, prints: arr });
+  }
+
   async function saveNote() {
     if (!noteEvent) return;
     if (noteText.trim()) await api('events_set_note', { id: noteEvent.id, note: noteText });
@@ -588,7 +599,8 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
           <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'var(--color-primary-light)' }}>
             <CameraIcon />
             <span style={{ fontWeight: 600 }}>מצב צילום — לחצי על תלמיד/ה כדי לצלם</span>
-            <button className="pill-btn ghost" style={{ marginInlineStart: 'auto' }} onClick={() => setPhotoMode(false)}>סיום</button>
+            <button className="pill-btn secondary" style={{ marginInlineStart: 'auto' }} onClick={() => setGroupPhoto(true)}>תמונה קבוצתית / מהגלריה</button>
+            <button className="pill-btn ghost" onClick={() => setPhotoMode(false)}>סיום</button>
           </div>
         )}
 
@@ -673,6 +685,7 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
               </div>
               <textarea rows={5} placeholder="הערות לעצמי: מה להדפיס, להכין, להביא…" value={prepNotes}
                 onChange={(e) => setPrepNotes(e.target.value)} onBlur={() => saveLessonField('notes', prepNotes)} />
+              <PrintListEditor key={`${lesson.date}-${lesson.period}`} value={prints} onCommit={savePrints} compact />
             </>
           ))}
 
@@ -768,6 +781,14 @@ export default function ClassroomView({ classId, onBack, onSwitchClass, onOpenRe
             <button className="pill-btn ghost" onClick={() => setConfirmLeave(false)}>להישאר בכיתה</button>
           </div>
         </div>
+      )}
+
+      {groupPhoto && (
+        <GroupPhotoTagger
+          students={sortStudents(students, sortBy, nameOrder).map((st) => displayById[st.id] || st)}
+          onSave={async (studentId, dataUrl) => { await api('photo_upload', { studentId, imageBase64: dataUrl }); await reloadStudents(); }}
+          onClose={() => setGroupPhoto(false)}
+        />
       )}
 
       {photoStudent && (

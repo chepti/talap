@@ -156,6 +156,8 @@ function StudentCard({ classes }) {
     api('events_range', { from, to, studentId }).then((r) => setLessons(r.lessons)).catch((e) => setError(e.message));
   }, [studentId, from, to]);
 
+  const selected = students.find((s) => String(s.id) === String(studentId));
+
   const allEvents = useMemo(() => {
     if (!lessons) return [];
     return lessons.flatMap((g) => g.events.map((e) => ({ ...e, date: g.date, subject: g.subject, period: g.period })))
@@ -191,6 +193,19 @@ function StudentCard({ classes }) {
       </div>
 
       {error && <div style={{ color: 'var(--color-removal)' }}>{error}</div>}
+
+      {selected && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {selected.photoUrl ? (
+            <img src={selected.photoUrl} alt="" width={72} height={72} style={{ borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--color-primary)' }} />
+          ) : (
+            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 700 }}>
+              {selected.fullName.trim().split(/s+/).slice(0, 2).map((p) => p[0]).join('')}
+            </div>
+          )}
+          <h2 style={{ margin: 0 }}>{selected.fullName}</h2>
+        </div>
+      )}
 
       {lessons && (
         <>

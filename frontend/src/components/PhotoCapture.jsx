@@ -5,6 +5,7 @@ const OUTPUT = 240;
 
 export default function PhotoCapture({ onSave, onCancel }) {
   const fileInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const [imgEl, setImgEl] = useState(null); // HTMLImageElement, loaded
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -14,8 +15,13 @@ export default function PhotoCapture({ onSave, onCancel }) {
     fileInputRef.current?.click();
   }
 
+  function pickGallery() {
+    galleryInputRef.current?.click();
+  }
+
   function handleFile(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -89,12 +95,14 @@ export default function PhotoCapture({ onSave, onCancel }) {
     }}>
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
         <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+        <input ref={galleryInputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
 
         {!imgEl && (
           <>
             <span>צילום תמונה או בחירה מהגלריה</span>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="pill-btn" onClick={pickFile}>פתיחת מצלמה</button>
+              <button className="pill-btn" onClick={pickFile}>צילום</button>
+              <button className="pill-btn secondary" onClick={pickGallery}>מהגלריה</button>
               <button className="pill-btn ghost" onClick={onCancel}>ביטול</button>
             </div>
           </>
@@ -132,7 +140,8 @@ export default function PhotoCapture({ onSave, onCancel }) {
                 style={{ flex: 1 }} />
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="pill-btn secondary" onClick={pickFile}>תמונה אחרת</button>
+              <button className="pill-btn secondary" onClick={pickFile}>צילום</button>
+              <button className="pill-btn secondary" onClick={pickGallery}>גלריה</button>
               <button className="pill-btn" onClick={confirm}>אישור וחיתוך</button>
               <button className="pill-btn ghost" onClick={onCancel}>ביטול</button>
             </div>

@@ -48,3 +48,6 @@
     -d '{"ops":[{"action":"mark_synced","ids":[12,13]}]}'
   ```
   תשובה: `{"results":[{"i":0,"action":"mark_synced","ok":true,"result":{...}}], "now":"..."}`
+
+## הדפסות
+ראו `llms.txt`: שדה `prints` בשיעור, `print_settings_*`, `print_digest`.

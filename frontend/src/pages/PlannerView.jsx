@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { useSyncVersion, sync } from '../lib/offline';
+import PrintListEditor from '../components/PrintListEditor';
+import PrintSettings from '../components/PrintSettings';
 import { todayStr } from '../lib/date';
 import { formatHebrewDate } from '../lib/hebrewDate';
 
@@ -59,7 +61,13 @@ function PlanCard({ entry, className, date, lesson }) {
     setTimeout(() => setSaved(false), 1500);
   }
 
-  const filled = topic.trim() || planUrl.trim() || notes.trim();
+  async function savePrints(arr) {
+    await api('lesson_topic', { classId: entry.classId, date, period: entry.period, prints: arr });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  const filled = topic.trim() || planUrl.trim() || notes.trim() || (lesson?.prints?.length > 0);
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 8, background: filled ? 'var(--color-primary-light)' : '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
@@ -90,6 +98,7 @@ function PlanCard({ entry, className, date, lesson }) {
         rows={2} placeholder="הערות לעצמי: מה להדפיס, להכין, להביא…" value={notes}
         onChange={(e) => setNotes(e.target.value)} onBlur={() => save('notes', notes)}
       />
+      <PrintListEditor value={lesson?.prints} onCommit={savePrints} compact />
     </div>
   );
 }
@@ -101,6 +110,7 @@ export default function PlannerView({ onBack }) {
   const [lessons, setLessons] = useState(null);
   const [classFilter, setClassFilter] = useState('');
   const [error, setError] = useState('');
+  const [showPrint, setShowPrint] = useState(false);
 
   useEffect(() => {
     Promise.all([api('classes_list'), api('schedule_list')])
@@ -144,7 +154,9 @@ export default function PlannerView({ onBack }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button className="pill-btn ghost" onClick={onBack}>← חזרה</button>
         <h1 style={{ margin: 0 }}>תכנון שיעורים</h1>
+        <button className="pill-btn secondary" style={{ marginInlineStart: 'auto' }} onClick={() => setShowPrint((v) => !v)}>מייל הדפסות</button>
       </div>
+      {showPrint && <PrintSettings onClose={() => setShowPrint(false)} />}
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="pill-btn ghost" onClick={() => setWeekStart((w) => addDays(w, -7))}>‹ שבוע קודם</button>

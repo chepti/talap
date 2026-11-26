@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
 
 require __DIR__ . '/config.php';
 require __DIR__ . '/lib/store.php';
+require __DIR__ . '/lib/prints.php';
 
 date_default_timezone_set('Asia/Jerusalem');
 
@@ -79,6 +80,8 @@ function helpDoc() {
             'schedule_set'    => 'POST — {entries:[{dayOfWeek(0=ראשון..6=שבת), period, startTime(HH:MM), endTime(HH:MM), classId, subject, mashovSubjectLabel?}]} — מחליף את כל המערכת.',
             'current_lesson'  => 'GET — ?classId=N&at=ISO(אופציונלי, ברירת מחדל עכשיו) — איזה שיעור (period+subject) פעיל כרגע לפי מערכת השעות.',
             'lesson_get'      => 'GET — ?classId=&date=&period= — נושא השיעור שכבר הוזן לשיעור הזה, אם יש.',
+            'print_settings_get / print_settings_set' => 'GET / POST {enabled?, dayOfWeek? (0=ראשון), hour?, recipients? [מיילים]} — הגדרות מייל ההדפסות השבועי.',
+            'print_digest'    => 'POST {preview?} — preview=true מחזיר את פירוט ההדפסות לשבוע הקרוב; בלעדיו שולח עכשיו מייל מרוכז לנמענים. הקבצים להדפסה נשמרים בשיעור: lesson_topic {prints:[{title,url,copies,pages,note}]}.',
             'lesson_topic'    => 'POST — {classId, date(YYYY-MM-DD), period, topic?, planUrl?, notes?}. נושא השיעור + קישור לתכנון/מצגת (http/https) + הערות הכנה לעצמי. עדכון חלקי: רק שדות שנשלחו משתנים. אפשר להזין מראש לשיעורים עתידיים (מסך תכנון שיעורים).',
             'events_create'   => 'POST — {classId, studentId|studentMatch, type, date, period, note?}. type אחד מ-' . implode('/', array_keys(EVENT_TYPES)) . '. date+period מזהים את השיעור (ראו current_lesson).',
             'events_set_note' => 'POST — {id, note}. הוספת/עדכון הערה מילולית לאירוע קיים.',
@@ -108,7 +111,10 @@ if ($action === 'help') { out(helpDoc()); }
 
 /* ---------- שער אימות ---------- */
 $key = $_SERVER['HTTP_X_KEY'] ?? $_GET['key'] ?? '';
-if (!hash_equals($PASSWORD, (string)$key)) {
+// קריאת התזמון (GitHub Actions) נכנסת עם טוקן הפריסה, ורק לפעולת ה-tick
+$deployTok = $_SERVER['HTTP_X_DEPLOY_TOKEN'] ?? '';
+$isTick = $action === 'print_digest_tick' && !empty($DEPLOY_TOKEN) && hash_equals($DEPLOY_TOKEN, (string)$deployTok);
+if (!$isTick && !hash_equals($PASSWORD, (string)$key)) {
     http_response_code(401);
     out(['error' => 'unauthorized', 'hint' => 'שלחי header X-Key או ?key=; ראי ?action=help']);
 }
@@ -428,6 +434,7 @@ function dispatch($action, $data) {
         foreach (['topic', 'planUrl', 'notes'] as $f) {
             if (array_key_exists($f, $data)) $fields[$f] = mb_substr(trim((string)$data[$f]), 0, $f === 'planUrl' ? 500 : 2000);
         }
+        if (array_key_exists('prints', $data)) $fields['prints'] = sanitizePrints($data['prints']);
         if (!empty($fields['planUrl']) && !preg_match('#^https?://#i', $fields['planUrl'])) fail('planUrl must start with http:// or https://');
         $result = null;
         storeUpdate('lessons', [], function ($lessons) use ($classId, $date, $period, $fields, &$result) {
@@ -624,6 +631,37 @@ function dispatch($action, $data) {
             return $events;
         });
         return ['marked' => $ids];
+    }
+
+    case 'print_settings_get': {
+        return ['settings' => printSettings()];
+    }
+
+    case 'print_settings_set': {
+        $s = printSettings();
+        if (array_key_exists('enabled', $data)) $s['enabled'] = (bool)$data['enabled'];
+        if (array_key_exists('dayOfWeek', $data)) $s['dayOfWeek'] = max(0, min(6, (int)$data['dayOfWeek']));
+        if (array_key_exists('hour', $data)) $s['hour'] = max(0, min(23, (int)$data['hour']));
+        if (array_key_exists('recipients', $data)) {
+            $list = is_array($data['recipients']) ? $data['recipients'] : preg_split('/[\s,;]+/', (string)$data['recipients']);
+            $s['recipients'] = array_values(array_unique(array_filter(array_map('trim', $list), function ($m) { return filter_var($m, FILTER_VALIDATE_EMAIL); })));
+        }
+        storeWrite('print_settings', $s);
+        return ['settings' => $s];
+    }
+
+    case 'print_digest': {
+        // preview=true — רק תוכן, בלי שליחה. אחרת שולח מיד (גם מחוץ ליום/שעה שנקבעו).
+        if (!empty($data['preview'])) {
+            $d = buildPrintDigest(date('Y-m-d', strtotime('+1 day')), date('Y-m-d', strtotime('+7 days')));
+            unset($d['html']);
+            return $d;
+        }
+        return runPrintDigest(true);
+    }
+
+    case 'print_digest_tick': {
+        return runPrintDigest(false);
     }
 
     default:

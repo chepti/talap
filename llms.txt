@@ -44,3 +44,9 @@ homework (לא הכין שיעורי בית) · removal (הרחקה משיעור
 
 ## מדריך מלא
 - https://chepti.com/talap/AGENT.md
+
+## הדפסות (מייל שבועי מרוכז)
+- `lesson_topic` מקבל גם `prints: [{title, url, copies, pages, note}]` (קבצים להדפסה לשיעור).
+- `print_settings_get` / `print_settings_set {enabled, dayOfWeek, hour, recipients}` — הגדרות המייל.
+- `print_digest {preview:true}` — פירוט לשבוע הקרוב; בלי preview שולח עכשיו מייל מרוכז לנמענים.
+- `print_digest_tick` — נקרא ע"י GitHub Actions כל שעה (טוקן פריסה); השרת מחליט אם הגיע הזמן לשלוח.
